@@ -1,0 +1,176 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-display: "Playfair Display", Georgia, "Times New Roman", serif;
+}
+
+html {
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  @apply bg-zinc-100 text-zinc-900 antialiased;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #d4d4d8;
+  border-radius: 8px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #a1a1aa;
+}
+
+/* --------------------- Impressão (comprovante de venda) --------------------- */
+@media print {
+  body {
+    background: #ffffff !important;
+  }
+
+  aside,
+  header,
+  nav,
+  .receipt-actions,
+  .toast,
+  .page-header {
+    display: none !important;
+  }
+
+  .main-content {
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .sale-receipt {
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    width: 100% !important;
+    max-width: 56mm !important;
+    margin: 0 auto !important;
+    padding: 3mm 1mm !important;
+    color: #000 !important;
+  }
+
+  .sale-receipt * {
+    color: #000 !important;
+  }
+
+  .sale-receipt .receipt-logo {
+    width: 26mm !important;
+    height: auto !important;
+    max-width: 30mm !important;
+    object-fit: contain !important;
+    display: block !important;
+    margin: 0 auto 1mm !important;
+  }
+
+  .sale-receipt .font-display {
+    font-size: 17px !important;
+    line-height: 1.25 !important;
+  }
+
+  .sale-receipt .text-xl {
+    font-size: 17px !important;
+  }
+
+  .sale-receipt .text-base {
+    font-size: 14px !important;
+  }
+
+  .sale-receipt .text-sm {
+    font-size: 12px !important;
+    line-height: 1.4 !important;
+  }
+
+  .sale-receipt .text-xs {
+    font-size: 10.5px !important;
+    line-height: 1.4 !important;
+  }
+
+  .sale-receipt .text-\[11px\] {
+    font-size: 10px !important;
+    line-height: 1.4 !important;
+  }
+
+  .sale-receipt .text-\[10px\] {
+    font-size: 9px !important;
+    line-height: 1.4 !important;
+  }
+
+  .sale-receipt .mt-3 {
+    margin-top: 8px !important;
+  }
+
+  .sale-receipt .mt-4 {
+    margin-top: 10px !important;
+  }
+
+  .sale-receipt .mt-5 {
+    margin-top: 12px !important;
+  }
+
+  .sale-receipt .space-y-1\.5 > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 5px !important;
+  }
+
+  .sale-receipt .space-y-2 > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 6px !important;
+  }
+
+  .sale-receipt .px-3 {
+    padding-left: 8px !important;
+    padding-right: 8px !important;
+  }
+
+  .sale-receipt .py-2 {
+    padding-top: 6px !important;
+    padding-bottom: 6px !important;
+  }
+
+  .sale-receipt .py-2\.5 {
+    padding-top: 7px !important;
+    padding-bottom: 7px !important;
+  }
+
+  .sale-receipt .gap-1 {
+    gap: 2px !important;
+  }
+
+  .sale-receipt .gap-1\.5 {
+    gap: 3px !important;
+  }
+
+  .sale-receipt .sale-item-row {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .sale-receipt .sale-item-row .flex > span:first-child {
+    min-width: 0;
+    overflow-wrap: break-word;
+  }
+
+  .sale-receipt .flex.justify-between > span:last-child {
+    text-align: right;
+  }
+
+  .sale-receipt tr,
+  .sale-receipt .sale-receipt-row {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  @page {
+    size: 60mm auto;
+    margin: 0;
+  }
+}
