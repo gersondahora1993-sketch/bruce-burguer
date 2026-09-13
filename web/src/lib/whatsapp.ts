@@ -2,8 +2,9 @@ import { money } from "./format";
 
 export interface WhatsappOrderItem {
   name: string;
-  color: string;
-  size: string;
+  color?: string;
+  size?: string;
+  addons?: { name: string; quantity: number }[];
   quantity: number;
   unit_cents: number;
   line_cents: number;
@@ -29,7 +30,11 @@ export function buildOrderMessage(order: WhatsappOrder): string {
     "*Itens do pedido:*",
   ];
   for (const it of order.items) {
-    lines.push(`• ${it.name} (${it.color}/${it.size}) x${it.quantity} — ${money(it.line_cents)}`);
+    const variant = it.color && it.size ? ` (${it.color}/${it.size})` : it.color ? ` (${it.color})` : it.size ? ` (${it.size})` : "";
+    lines.push(`• ${it.name}${variant} x${it.quantity} — ${money(it.line_cents)}`);
+    if (it.addons && it.addons.length > 0) {
+      lines.push(`   Adicionais: ${it.addons.map((a) => `${a.name}${a.quantity > 1 ? ` ×${a.quantity}` : ""}`).join(", ")}`);
+    }
   }
   lines.push(``, `*Total: ${money(order.totalCents)}*`, `*Pagamento: ${order.paymentLabel}*`);
   return lines.join("\n");
@@ -51,7 +56,10 @@ export function buildStoreOrderMessage(order: StoreOrderData): string {
   if (order.orderId) lines.push(`*Pedido: #${String(order.orderId).padStart(4, "0")}*`);
   lines.push(``, "*Itens:*");
   for (const it of order.items) {
-    lines.push(`• ${it.name} (${it.color}/${it.size}) x${it.quantity} — ${money(it.line_cents)}`);
+    lines.push(`• ${it.name} x${it.quantity} — ${money(it.line_cents)}`);
+    if (it.addons && it.addons.length > 0) {
+      lines.push(`   Adicionais: ${it.addons.map((a) => `${a.name}${a.quantity > 1 ? ` ×${a.quantity}` : ""}`).join(", ")}`);
+    }
   }
   lines.push(``, `*Total: ${money(order.totalCents)}*`, `*Pagamento: ${order.paymentLabel}*`, ``);
   lines.push(`*Cliente:* ${order.customerName}`, `*Telefone:* ${order.customerPhone}`);

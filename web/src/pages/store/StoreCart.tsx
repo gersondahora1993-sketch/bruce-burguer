@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, Minus, Plus, ShoppingBag, Trash2, User, Phone, MapPin, StickyNote } from "lucide-react";
+import { ArrowLeft, Minus, Plus, ShoppingBag, Trash2, User, Phone, MapPin, StickyNote, Home } from "lucide-react";
 import { api } from "../../api/client";
 import { useToast } from "../../context/ToastContext";
 import { Button, Card, EmptyState, Field, Input, Textarea } from "../../components/ui";
@@ -8,6 +8,7 @@ import { money } from "../../lib/format";
 import type { PaymentMethod } from "../../types";
 import { PAYMENT_OPTIONS } from "../../types";
 import { useStoreCart } from "./StoreCartContext";
+import type { StoreCartItem } from "./StoreCartContext";
 
 const CHECKOUT_PAYMENTS = PAYMENT_OPTIONS.filter((p) => p.value !== "fiado");
 
@@ -18,6 +19,22 @@ interface OrderResult {
   created_at: string;
 }
 
+interface SuccessItem {
+  name: string;
+  quantity: number;
+  unit_cents: number;
+  line_cents: number;
+  addons: { name: string; quantity: number }[];
+}
+
+function itemUnitCents(item: StoreCartItem): number {
+  return item.addons.reduce((sum, a) => sum + a.price_cents * a.quantity, 0) + item.unitCents;
+}
+
+function itemLineCents(item: StoreCartItem): number {
+  return itemUnitCents(item) * item.quantity;
+}
+
 export default function StoreCart() {
   const navigate = useNavigate();
   const { success, error: toastError } = useToast();
@@ -25,7 +42,10 @@ export default function StoreCart() {
 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [address, setAddress] = useState("");
+  const [street, setStreet] = useState("");
+  const [neighborhood, setNeighborhood] = useState("");
+  const [complement, setComplement] = useState("");
+  const [reference, setReference] = useState("");
   const [notes, setNotes] = useState("");
   const [payment, setPayment] = useState<PaymentMethod>("pix");
   const [sending, setSending] = useState(false);
@@ -39,14 +59,36 @@ export default function StoreCart() {
     }
     setSending(true);
     try {
+      const payload = items.map((i) =>
+        i.productId != null
+          ? {
+              product_id: i.productId,
+              quantity: i.quantity,
+              addons: i.addons.map((a) => ({ addon_id: a.id, quantity: a.quantity })),
+            }
+          : { combo_id: i.comboId, quantity: i.quantity }
+      );
       const res = await api.post<OrderResult>("/api/orders", {
         customer_name: name.trim(),
         customer_phone: phone.trim(),
-        address: address.trim(),
+        street: street.trim(),
+        neighborhood: neighborhood.trim(),
+        complement: complement.trim(),
+        reference: reference.trim(),
         notes: notes.trim(),
         payment_method: payment,
-        items: items.map((i) => ({ variation_id: i.variationId, quantity: i.quantity })),
+        items: payload,
       });
+      const address = [street.trim(), neighborhood.trim(), complement.trim(), reference.trim()]
+        .filter(Boolean)
+        .join(", ");
+      const successItems: SuccessItem[] = items.map((i) => ({
+        name: i.name,
+        quantity: i.quantity,
+        unit_cents: itemUnitCents(i),
+        line_cents: itemLineCents(i),
+        addons: i.addons.map((a) => ({ name: a.name, quantity: a.quantity })),
+      }));
       clear();
       navigate("/loja/sucesso", {
         state: {
@@ -54,17 +96,10 @@ export default function StoreCart() {
           totalCents: res.total_cents,
           customerName: name.trim(),
           customerPhone: phone.trim(),
-          address: address.trim(),
+          address,
           notes: notes.trim(),
           paymentLabel: PAYMENT_OPTIONS.find((p) => p.value === payment)?.label ?? payment,
-          items: items.map((i) => ({
-            name: i.name,
-            color: i.colorName,
-            size: i.sizeName,
-            quantity: i.quantity,
-            unit_cents: i.unitCents,
-            line_cents: i.unitCents * i.quantity,
-          })),
+          items: successItems,
         },
       });
       success("Pedido registrado!");
@@ -99,32 +134,34 @@ export default function StoreCart() {
         {/* Itens */}
         <div className="space-y-3">
           {items.map((i) => (
-            <Card key={i.variationId} className="flex items-center gap-3 p-3.5">
+            <Card key={i.key} className="flex items-center gap-3 p-3.5">
               {i.image ? (
                 <img src={i.image} alt={i.name} className="h-16 w-16 shrink-0 rounded-xl object-cover" />
               ) : (
-                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-rose-100 text-rose-300">
+                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-500">
                   <ShoppingBag size={22} />
                 </div>
               )}
               <div className="min-w-0 flex-1">
                 <p className="truncate font-medium text-zinc-900">{i.name}</p>
-                <p className="text-xs text-zinc-500">
-                  {i.colorName} · {i.sizeName}
-                </p>
-                <p className="mt-0.5 text-sm font-semibold text-rose-600">{money(i.unitCents * i.quantity)}</p>
+                {i.addons.length > 0 && (
+                  <p className="mt-0.5 text-xs text-zinc-500">
+                    {i.addons.map((a) => `${a.name}${a.quantity > 1 ? ` ×${a.quantity}` : ""}`).join(", ")}
+                  </p>
+                )}
+                <p className="mt-0.5 text-sm font-semibold text-amber-600">{money(itemLineCents(i))}</p>
               </div>
               <div className="flex flex-col items-end gap-2">
                 <div className="flex items-center gap-1">
-                  <button onClick={() => setQuantity(i.variationId, i.quantity - 1)} className="rounded-md bg-zinc-100 p-1.5 text-zinc-600" aria-label="Diminuir">
+                  <button onClick={() => setQuantity(i.key, i.quantity - 1)} className="rounded-md bg-zinc-100 p-1.5 text-zinc-600" aria-label="Diminuir">
                     <Minus size={13} />
                   </button>
                   <span className="w-7 text-center text-sm font-semibold">{i.quantity}</span>
-                  <button onClick={() => setQuantity(i.variationId, i.quantity + 1)} className="rounded-md bg-zinc-100 p-1.5 text-zinc-600" aria-label="Aumentar">
+                  <button onClick={() => setQuantity(i.key, i.quantity + 1)} className="rounded-md bg-zinc-100 p-1.5 text-zinc-600" aria-label="Aumentar">
                     <Plus size={13} />
                   </button>
                 </div>
-                <button onClick={() => remove(i.variationId)} className="text-xs text-zinc-400 hover:text-rose-600" aria-label="Remover item">
+                <button onClick={() => remove(i.key)} className="text-xs text-zinc-400 hover:text-rose-600" aria-label="Remover item">
                   <Trash2 size={14} />
                 </button>
               </div>
@@ -151,11 +188,25 @@ export default function StoreCart() {
             </Field>
             <Field label="Endereço de entrega">
               <div className="relative">
-                <MapPin size={15} className="absolute top-1/2 left-3 -translate-y-1/2 text-zinc-400" />
-                <Input className="pl-9" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Rua, número, bairro, cidade" />
+                <Home size={15} className="absolute top-1/2 left-3 -translate-y-1/2 text-zinc-400" />
+                <Input className="pl-9" value={street} onChange={(e) => setStreet(e.target.value)} placeholder="Rua, número, bairro, cidade" />
               </div>
             </Field>
-            <Field label="Observação" hint="Opcional — ex.: cor da embalagem, horário">
+            <div className="grid grid-cols-2 gap-2">
+              <Field label="Bairro">
+                <Input value={neighborhood} onChange={(e) => setNeighborhood(e.target.value)} placeholder="Bairro" />
+              </Field>
+              <Field label="Complemento">
+                <Input value={complement} onChange={(e) => setComplement(e.target.value)} placeholder="Ex.: casa 12" />
+              </Field>
+            </div>
+            <Field label="Ponto de referência">
+              <div className="relative">
+                <MapPin size={15} className="absolute top-1/2 left-3 -translate-y-1/2 text-zinc-400" />
+                <Input className="pl-9" value={reference} onChange={(e) => setReference(e.target.value)} placeholder="Referência para encontrar o endereço" />
+              </div>
+            </Field>
+            <Field label="Observação" hint="Opcional">
               <div className="relative">
                 <StickyNote size={15} className="absolute top-3 left-3 text-zinc-400" />
                 <Textarea className="pl-9" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
@@ -171,7 +222,7 @@ export default function StoreCart() {
                     type="button"
                     onClick={() => setPayment(p.value)}
                     className={`rounded-xl border px-3 py-2.5 text-sm font-medium transition ${
-                      payment === p.value ? "border-rose-600 bg-rose-600 text-white shadow-sm" : "border-zinc-300 bg-white text-zinc-600"
+                      payment === p.value ? "border-amber-600 bg-amber-600 text-white shadow-sm" : "border-zinc-300 bg-white text-zinc-600"
                     }`}
                   >
                     {p.label}
@@ -182,7 +233,7 @@ export default function StoreCart() {
 
             <div className="flex items-center justify-between border-t border-zinc-100 pt-3">
               <span className="text-sm text-zinc-500">Total</span>
-              <span className="text-2xl font-bold text-rose-600">{money(totalCents)}</span>
+              <span className="text-2xl font-bold text-amber-600">{money(totalCents)}</span>
             </div>
 
             <Button size="lg" className="w-full" disabled={!valid || sending} loading={sending} onClick={submit}>

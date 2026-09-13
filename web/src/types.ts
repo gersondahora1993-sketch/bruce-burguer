@@ -242,8 +242,13 @@ export interface Order {
   id: number;
   customer_name: string;
   customer_phone: string;
-  address: string;
+  street: string;
+  neighborhood: string;
+  complement: string;
+  reference: string;
   notes: string;
+  subtotal_cents: number;
+  delivery_fee_cents: number;
   payment_method: string;
   total_cents: number;
   status: OrderStatus;
@@ -251,18 +256,25 @@ export interface Order {
   item_count: number;
 }
 
+export interface OrderItemAddon {
+  addon_id: number;
+  name: string;
+  quantity: number;
+  price_cents: number;
+  total_cents: number;
+}
+
 export interface OrderItem {
   id: number;
   order_id: number;
-  product_id: number;
-  variation_id: number;
-  product_name: string;
-  color_name: string;
-  size_name: string;
+  product_id: number | null;
   quantity: number;
   unit_price_cents: number;
   total_cents: number;
+  product_name: string;
   image_url?: string;
+  observation?: string;
+  addons: OrderItemAddon[];
 }
 
 export interface OrderDetail extends Order {
@@ -341,16 +353,10 @@ export interface CashResponse {
   current: CashSession | null;
 }
 
-export interface StoreVariation {
+export interface StoreAddon {
   id: number;
-  color_id: number;
-  color_name: string;
-  color_hex: string;
-  size_id: number;
-  size_name: string;
-  stock: number;
-  min_stock: number;
-  available: boolean;
+  name: string;
+  price_cents: number;
 }
 
 export interface StoreProduct {
@@ -362,8 +368,26 @@ export interface StoreProduct {
   category_name: string;
   sale_price_cents: number;
   image_url: string;
-  total_stock: number;
-  variations: StoreVariation[];
+  addons: StoreAddon[];
+}
+
+export interface StoreComboItem {
+  product_id: number;
+  product_name: string;
+  quantity: number;
+  sale_price_cents: number;
+  image_url: string;
+  category_id: number | null;
+  category_name: string | null;
+}
+
+export interface StoreCombo {
+  id: number;
+  name: string;
+  description: string;
+  sale_price_cents: number;
+  image_url: string;
+  items: StoreComboItem[];
 }
 
 export interface StoreInfo {

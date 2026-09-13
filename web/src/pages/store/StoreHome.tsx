@@ -6,7 +6,8 @@ import { useToast } from "../../context/ToastContext";
 import { Button, PageLoader, Skeleton } from "../../components/ui";
 import { money } from "../../lib/format";
 import { isBusinessOpen } from "../../lib/businessHours";
-import type { StoreProduct, StoreInfo } from "../../types";
+import type { StoreProduct, StoreInfo, StoreCombo } from "../../types";
+import { useStoreCart } from "./StoreCartContext";
 
 interface StoreCategory {
   id: number;
@@ -15,9 +16,11 @@ interface StoreCategory {
 
 export default function StoreHome() {
   const navigate = useNavigate();
-  const { error: toastError } = useToast();
+  const { error: toastError, success: toastSuccess } = useToast();
+  const { add: addToCart } = useStoreCart();
   const [products, setProducts] = useState<StoreProduct[] | null>(null);
   const [categories, setCategories] = useState<StoreCategory[]>([]);
+  const [combos, setCombos] = useState<StoreCombo[]>([]);
   const [cat, setCat] = useState<number | null>(null);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<"ABERTO" | "FECHADO" | "ERRO_CONFIGURACAO" | "CARREGANDO">("CARREGANDO");
@@ -76,9 +79,25 @@ export default function StoreHome() {
   }, [cat, search, toastError]);
 
   useEffect(() => {
+    api.get<StoreCombo[]>("/api/catalog/combos").then(setCombos).catch(() => null);
+  }, []);
+
+  useEffect(() => {
     const t = window.setTimeout(loadProducts, search ? 300 : 0);
     return () => window.clearTimeout(t);
   }, [loadProducts]);
+
+  function addCombo(combo: StoreCombo) {
+    addToCart({
+      productId: null,
+      comboId: combo.id,
+      name: combo.name,
+      image: combo.image_url,
+      unitCents: combo.sale_price_cents,
+      addons: [],
+    });
+    toastSuccess(`"${combo.name}" adicionado ao carrinho!`);
+  }
 
   if (status === "CARREGANDO" && !products) return <PageLoader />;
 
@@ -179,6 +198,68 @@ export default function StoreHome() {
         </div>
       </nav>
 
+      {/* COMBOS */}
+      {combos.length > 0 && (
+        <section className="mb-10">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="flex items-center gap-2">
+              {categoryIcons["Combos"]}
+              <h2 className="font-display text-xl font-bold text-zinc-900">Combos</h2>
+            </div>
+            <div className="flex-1 h-px bg-zinc-200"></div>
+          </div>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
+            {combos.map((c) => (
+              <div key={c.id} className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm transition-all hover:shadow-lg">
+                {c.image_url ? (
+                  <img
+                    src={c.image_url}
+                    alt={c.name}
+                    className="h-40 w-full object-cover sm:h-52"
+                    loading="lazy"
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                  />
+                ) : (
+                  <div className="flex h-40 w-full items-center justify-center bg-gradient-to-br from-amber-100 to-amber-200 text-amber-300 sm:h-52">
+                    <svg className="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v12" />
+                    </svg>
+                  </div>
+                )}
+                <div className="p-4">
+                  <p className="truncate text-sm font-semibold text-zinc-900">{c.name}</p>
+                  <p className="mt-1 text-xs text-zinc-400 line-clamp-1">{c.description || "Combo da casa"}</p>
+                  {c.items.length > 0 && (
+                    <p className="mt-1.5 text-[11px] text-zinc-500 line-clamp-2">
+                      {c.items.map((i) => `${i.product_name}${i.quantity > 1 ? ` ×${i.quantity}` : ""}`).join(" + ")}
+                    </p>
+                  )}
+                  <div className="mt-3 flex items-center justify-between gap-2">
+                    <span className="font-bold text-lg text-amber-600">
+                      {c.sale_price_cents === 0 ? (
+                        <span className="text-amber-500">Consulte o preço</span>
+                      ) : (
+                        money(c.sale_price_cents)
+                      )}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => addCombo(c)}
+                      className="inline-flex items-center gap-1 rounded-full bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-amber-700"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                      Adicionar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* PRODUTOS POR CATEGORIA */}
       {!products ? (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
@@ -260,9 +341,6 @@ export default function StoreHome() {
                                   money(p.sale_price_cents)
                                 )}
                               </span>
-                              {p.total_stock === 0 && (
-                                <span className="text-xs font-medium text-red-500 bg-red-50 px-2 py-1 rounded-full">Esgotado</span>
-                              )}
                             </div>
                           </div>
                         </Link>

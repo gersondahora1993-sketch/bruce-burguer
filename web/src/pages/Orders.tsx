@@ -74,12 +74,12 @@ export default function Orders() {
     try {
       await api.patch(`/api/orders/${order.id}/status`, { status: next });
       if (next === "confirmado") {
-        success(`Pedido #${String(order.id).padStart(4, "0")} confirmado — estoque baixado.`);
+        success(`Pedido #${String(order.id).padStart(4, "0")} confirmado.`);
       } else if (next === "cancelado") {
         success(
           order.status === "novo"
             ? `Pedido #${String(order.id).padStart(4, "0")} cancelado.`
-            : `Pedido #${String(order.id).padStart(4, "0")} cancelado — estoque devolvido.`
+            : `Pedido #${String(order.id).padStart(4, "0")} cancelado.`
         );
       } else {
         success(`Pedido #${String(order.id).padStart(4, "0")} marcado como ${ORDER_STATUS_LABELS[next].toLowerCase()}.`);
@@ -150,12 +150,18 @@ export default function Orders() {
                     <div className="space-y-3">
                       <div className="space-y-1.5">
                         {detail.items.map((it) => (
-                          <div key={it.id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
-                            <span className="text-zinc-700">
-                              {it.product_name} <span className="text-zinc-400">({it.color_name}/{it.size_name})</span>{" "}
-                              <span className="text-zinc-400">×{it.quantity}</span>
-                            </span>
-                            <span className="font-medium text-zinc-800">{money(it.total_cents)}</span>
+                          <div key={it.id} className="text-sm">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <span className="text-zinc-700">
+                                {it.product_name} <span className="text-zinc-400">×{it.quantity}</span>
+                              </span>
+                              <span className="font-medium text-zinc-800">{money(it.total_cents)}</span>
+                            </div>
+                            {it.addons && it.addons.length > 0 && (
+                              <p className="mt-0.5 text-xs text-zinc-400">
+                                Adicionais: {it.addons.map((a) => `${a.name}${a.quantity > 1 ? ` ×${a.quantity}` : ""}`).join(", ")} (+{money(it.addons.reduce((sum, a) => sum + a.total_cents, 0))})
+                              </p>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -163,9 +169,10 @@ export default function Orders() {
                         <p className="flex items-center gap-1.5">
                           <Phone size={12} className="text-zinc-400" /> {detail.customer_phone}
                         </p>
-                        {detail.address && (
+                        {(detail.street || detail.neighborhood) && (
                           <p className="flex items-center gap-1.5">
-                            <MapPin size={12} className="text-zinc-400" /> {detail.address}
+                            <MapPin size={12} className="text-zinc-400" />{" "}
+                            {[detail.street, detail.neighborhood, detail.complement, detail.reference].filter(Boolean).join(", ")}
                           </p>
                         )}
                         {detail.notes && (

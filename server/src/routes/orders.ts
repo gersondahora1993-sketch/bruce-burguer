@@ -1,12 +1,32 @@
 import { Router } from "express";
 import { db, now } from "../db.js";
-import { requireAuth, requireSubscriptionContext, requireTenant } from "../auth.js";
+import { requireAuth, requireTenant } from "../auth.js";
 import { env } from "../config.js";
 import type { Request, Response } from "express";
 
 const router = Router();
 
 export const ORDER_STATUSES = ["novo", "confirmado", "em_preparacao", "pronto", "entregue", "cancelado"];
+
+const STATUS_FLOW = ["novo", "confirmado", "em_preparacao", "pronto", "entregue", "cancelado"];
+
+function asString(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+interface AddonSpec {
+  addon_id: number;
+  quantity: number;
+}
+
+interface ItemSpec {
+  kind: "product" | "combo";
+  id: number;
+  quantity: number;
+  addons: AddonSpec[];
+}
+
+/* ------------------------- Criação de pedido (loja pública) ------------------------- */
 
 router.post("/", (req: Request, res: Response) => {
   const body = req.body ?? {};
@@ -16,11 +36,15 @@ router.post("/", (req: Request, res: Response) => {
     res.status(503).json({ error: "Pedidos públicos não estão configurados para uma empresa." });
     return;
   }
-  const customerName = typeof body.customer_name === "string" ? body.customer_name.trim() : "";
-  const customerPhone = typeof body.customer_phone === "string" ? body.customer_phone.trim() : "";
-  const address = typeof body.address === "string" ? body.address.trim() : "";
-  const notes = typeof body.notes === "string" ? body.notes.trim() : "";
-  const paymentMethod = typeof body.payment_method === "string" ? body.payment_method : "pix";
+
+  const customerName = asString(body.customer_name);
+  const customerPhone = asString(body.customer_phone);
+  const street = asString(body.street);
+  const neighborhood = asString(body.neighborhood);
+  const complement = asString(body.complement);
+  const reference = asString(body.reference);
+  const notes = asString(body.notes);
+  const paymentMethod = asString(body.payment_method) || "pix";
 
   if (!customerName) {
     res.status(400).json({ error: "Informe o seu nome." });
@@ -35,70 +59,187 @@ router.post("/", (req: Request, res: Response) => {
     return;
   }
 
-  interface OrderItem {
-    variation_id: number;
-    quantity: number;
-  }
-  const items: OrderItem[] = [];
-  for (const it of body.items) {
-    const variation_id = Number(it?.variation_id);
-    const quantity = Number(it?.quantity);
-    if (!variation_id || !Number.isInteger(quantity) || quantity <= 0) {
+  const specs: ItemSpec[] = [];
+  for (const raw of body.items) {
+    const it = raw ?? {};
+    const quantity = Number(it.quantity);
+    if (!Number.isInteger(quantity) || quantity <= 0) {
       res.status(400).json({ error: "Item do pedido inválido." });
       return;
     }
-    items.push({ variation_id, quantity });
+    const hasProduct = it.product_id !== undefined && it.product_id !== null && it.product_id !== "";
+    const hasCombo = it.combo_id !== undefined && it.combo_id !== null && it.combo_id !== "";
+    if (hasProduct === hasCombo) {
+      res.status(400).json({ error: "Cada item do pedido deve conter product_id ou combo_id." });
+      return;
+    }
+    if (hasProduct) {
+      const productId = Number(it.product_id);
+      if (!Number.isInteger(productId) || productId <= 0) {
+        res.status(400).json({ error: "Produto inválido." });
+        return;
+      }
+      const addons: AddonSpec[] = [];
+      const rawAddons = Array.isArray(it.addons) ? it.addons : [];
+      for (const a of rawAddons) {
+        const addonId = Number(a?.addon_id);
+        const addonQty = Number(a?.quantity);
+        if (!Number.isInteger(addonId) || addonId <= 0 || !Number.isInteger(addonQty) || addonQty <= 0) {
+          res.status(400).json({ error: "Adicional do item inválido." });
+          return;
+        }
+        addons.push({ addon_id: addonId, quantity: addonQty });
+      }
+      specs.push({ kind: "product", id: productId, quantity, addons });
+    } else {
+      const comboId = Number(it.combo_id);
+      if (!Number.isInteger(comboId) || comboId <= 0) {
+        res.status(400).json({ error: "Combo inválido." });
+        return;
+      }
+      if (Array.isArray(it.addons) && it.addons.length > 0) {
+        res.status(400).json({ error: "Combos não aceitam adicionais individuais." });
+        return;
+      }
+      specs.push({ kind: "combo", id: comboId, quantity, addons: [] });
+    }
   }
 
   const tx = db.transaction(() => {
-    const fetched = items.map((it) => {
-      const row = db
-        .prepare(
-          `SELECT v.id, v.stock, v.company_id AS variation_company_id, p.id AS product_id, p.name AS product_name, p.sale_price_cents,
-                  p.company_id AS product_company_id, p.active AS product_active, col.name AS color_name, s.name AS size_name
-           FROM product_variations v
-           JOIN products p ON p.id = v.product_id
-           JOIN colors col ON col.id = v.color_id
-           JOIN sizes s ON s.id = v.size_id
-           WHERE v.id = ? AND v.company_id = ? AND p.company_id = ?`
-        )
-        .get(it.variation_id, companyId, companyId) as any;
-      return { ...it, row };
+    const lines = specs.map((spec) => {
+      if (spec.kind === "product") {
+        const row = db
+          .prepare(
+            `SELECT p.id, p.name, p.sale_price_cents, p.active, p.image_url
+             FROM products p
+             WHERE p.id = ? AND p.company_id = ?`
+          )
+          .get(spec.id, companyId) as {
+          id: number;
+          name: string;
+          sale_price_cents: number;
+          active: number;
+          image_url: string;
+        } | undefined;
+        if (!row || row.active !== 1) {
+          throw new Error("Algum produto não está mais disponível. Atualize o carrinho.");
+        }
+
+        const addonLines = spec.addons.map((a) => {
+          const addonRow = db
+            .prepare("SELECT id, name, price_cents, active FROM addons WHERE id = ? AND company_id = ?")
+            .get(a.addon_id, companyId) as {
+            id: number;
+            name: string;
+            price_cents: number;
+            active: number;
+          } | undefined;
+          if (!addonRow || addonRow.active !== 1) {
+            throw new Error(`Adicional indisponível para "${row.name}". Atualize o carrinho.`);
+          }
+          const link = db
+            .prepare("SELECT 1 FROM product_addons WHERE product_id = ? AND addon_id = ? AND company_id = ?")
+            .get(spec.id, a.addon_id, companyId);
+          if (!link) {
+            throw new Error(`O adicional "${addonRow.name}" não está disponível para "${row.name}".`);
+          }
+          return { addon_id: a.addon_id, name: addonRow.name, price_cents: addonRow.price_cents, quantity: a.quantity };
+        });
+
+        const unit = row.sale_price_cents;
+        const addonPerUnit = addonLines.reduce((sum, a) => sum + a.price_cents * a.quantity, 0);
+        const line = (unit + addonPerUnit) * spec.quantity;
+        return {
+          kind: "product" as const,
+          product_id: row.id,
+          combo_id: null as number | null,
+          product_name: row.name,
+          image_url: row.image_url,
+          quantity: spec.quantity,
+          unit_cents: unit,
+          addons: addonLines,
+          line_cents: line,
+        };
+      }
+
+      const combo = db
+        .prepare("SELECT id, name, sale_price_cents, active FROM combos WHERE id = ? AND company_id = ?")
+        .get(spec.id, companyId) as { id: number; name: string; sale_price_cents: number; active: number } | undefined;
+      if (!combo || combo.active !== 1) {
+        throw new Error("Algum combo não está mais disponível. Atualize o carrinho.");
+      }
+      const line = combo.sale_price_cents * spec.quantity;
+      return {
+        kind: "combo" as const,
+        product_id: null as number | null,
+        combo_id: combo.id,
+        product_name: combo.name,
+        image_url: null,
+        quantity: spec.quantity,
+        unit_cents: combo.sale_price_cents,
+        addons: [] as { addon_id: number; name: string; price_cents: number; quantity: number }[],
+        line_cents: line,
+      };
     });
 
-    const invalid = fetched.filter(
-      (f) =>
-        !f.row ||
-        f.row.variation_company_id !== companyId ||
-        f.row.product_company_id !== companyId ||
-        f.row.product_active !== 1
-    );
-    if (invalid.length > 0) {
-      throw new Error("Alguns produtos não estão mais disponíveis ou não pertencem à sua loja. Atualize o carrinho.");
-    }
-
-    let total = 0;
-    const orderItems = fetched.map((f) => {
-      const line = f.row.sale_price_cents * f.quantity;
-      total += line;
-      return { ...f, unit: f.row.sale_price_cents, line };
-    });
+    const subtotal = lines.reduce((sum, l) => sum + l.line_cents, 0);
+    const deliveryFeeCents = 0;
+    const total = subtotal;
 
     const ts = now();
     const info = db
       .prepare(
-        `INSERT INTO orders (customer_name, customer_phone, address, notes, payment_method, total_cents, status, user_id, company_id, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, 'novo', ?, ?, ?)`
+        `INSERT INTO orders (
+           customer_name, customer_phone, street, neighborhood, complement, reference, notes,
+           subtotal_cents, delivery_fee_cents, total_cents, payment_method, status, company_id, created_at
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'novo', ?, ?)`
       )
-      .run(customerName, customerPhone, address, notes, paymentMethod, total, userId ?? null, companyId, ts);
+      .run(
+        customerName,
+        customerPhone,
+        street,
+        neighborhood,
+        complement,
+        reference,
+        notes,
+        subtotal,
+        deliveryFeeCents,
+        total,
+        paymentMethod,
+        companyId,
+        ts
+      );
     const orderId = Number(info.lastInsertRowid);
 
     const insertItem = db.prepare(
-      `INSERT INTO order_items (order_id, product_id, variation_id, product_name, color_name, size_name, quantity, unit_price_cents, total_cents, company_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO order_items (order_id, product_id, quantity, price_cents, observation, company_id, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
     );
-    for (const st of orderItems) {
-      insertItem.run(orderId, st.row.product_id, st.row.id, st.row.product_name, st.row.color_name, st.row.size_name, st.quantity, st.unit, st.line, companyId);
+    const insertAddon = db.prepare(
+      `INSERT INTO order_item_addons (order_item_id, addon_id, quantity, price_cents, company_id, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)`
+    );
+
+    const persisted = [];
+    for (const l of lines) {
+      const observation = l.kind === "combo" ? l.product_name : "";
+      const itemInfo = insertItem.run(orderId, l.product_id, l.quantity, l.unit_cents, observation, companyId, ts);
+      const orderItemId = Number(itemInfo.lastInsertRowid);
+      for (const a of l.addons) {
+        insertAddon.run(orderItemId, a.addon_id, a.quantity, a.price_cents, companyId, ts);
+      }
+      persisted.push({
+        product_id: l.product_id,
+        combo_id: l.combo_id,
+        product_name: l.product_name,
+        quantity: l.quantity,
+        unit_cents: l.unit_cents,
+        addons: l.addons.map((a) => ({
+          ...a,
+          total_cents: a.price_cents * a.quantity * l.quantity,
+        })),
+        line_cents: l.line_cents,
+      });
     }
 
     return {
@@ -106,14 +247,8 @@ router.post("/", (req: Request, res: Response) => {
       total_cents: total,
       status: "novo",
       created_at: ts,
-      items: orderItems.map((st) => ({
-        name: st.row.product_name,
-        color: st.row.color_name,
-        size: st.row.size_name,
-        quantity: st.quantity,
-        unit: st.unit,
-        line: st.line,
-      })),
+      item_count: persisted.length,
+      items: persisted,
     };
   });
 
@@ -125,7 +260,9 @@ router.post("/", (req: Request, res: Response) => {
   }
 });
 
-router.get("/", requireAuth, requireTenant, requireSubscriptionContext, (req: Request, res: Response) => {
+/* ------------------------- Listagem (painel) ------------------------- */
+
+router.get("/", requireAuth, requireTenant, (req: Request, res: Response) => {
   const { status, search } = req.query;
   const where: string[] = [];
   const params: (string | number)[] = [];
@@ -140,10 +277,14 @@ router.get("/", requireAuth, requireTenant, requireSubscriptionContext, (req: Re
   }
   if (search && String(search).trim()) {
     where.push(
-      "(o.customer_name LIKE ? OR o.customer_phone LIKE ? OR EXISTS (SELECT 1 FROM order_items oi WHERE oi.order_id = o.id AND oi.company_id = o.company_id AND oi.product_name LIKE ?))"
+      `(o.customer_name LIKE ? OR o.customer_phone LIKE ? OR o.notes LIKE ? OR EXISTS (
+         SELECT 1 FROM order_items oi
+         LEFT JOIN products pp ON pp.id = oi.product_id
+         WHERE oi.order_id = o.id AND (pp.name LIKE ? OR oi.observation LIKE ?)
+       ))`
     );
     const term = `%${String(search).trim()}%`;
-    params.push(term, term, term);
+    params.push(term, term, term, term, term);
   }
 
   const rows = db
@@ -160,7 +301,9 @@ router.get("/", requireAuth, requireTenant, requireSubscriptionContext, (req: Re
   res.json(rows);
 });
 
-router.get("/:id", requireAuth, requireTenant, requireSubscriptionContext, (req: Request, res: Response) => {
+/* ------------------------- Detalhe (painel) ------------------------- */
+
+router.get("/:id", requireAuth, requireTenant, (req: Request, res: Response) => {
   const companyId = (req.user as any).company_id;
   const order = db.prepare("SELECT * FROM orders WHERE id = ? AND company_id = ?").get(Number(req.params.id), companyId) as any;
 
@@ -169,60 +312,65 @@ router.get("/:id", requireAuth, requireTenant, requireSubscriptionContext, (req:
     return;
   }
 
-  const items = db
+  const rows = db
     .prepare(
-        `SELECT oi.*, p.image_url
-         FROM order_items oi
-         JOIN orders parent_order ON parent_order.id = oi.order_id AND parent_order.company_id = ?
-           JOIN products p ON p.id = oi.product_id AND p.company_id = ?
-           JOIN product_variations v ON v.id = oi.variation_id AND v.company_id = ?
-         WHERE oi.order_id = ? AND oi.company_id = parent_order.company_id`
+      `SELECT oi.*, p.image_url, p.name AS product_name
+       FROM order_items oi
+       LEFT JOIN products p ON p.id = oi.product_id AND p.company_id = ?
+       WHERE oi.order_id = ? AND oi.company_id = ?
+       ORDER BY oi.id ASC`
+    )
+    .all(companyId, order.id, companyId) as any[];
+
+  const items = rows.map((row) => {
+    const addonRows = db
+      .prepare(
+        `SELECT oia.addon_id, oia.quantity, oia.price_cents, a.name AS name
+         FROM order_item_addons oia
+         LEFT JOIN addons a ON a.id = oia.addon_id
+         WHERE oia.order_item_id = ? AND oia.company_id = ?
+         ORDER BY oia.id ASC`
       )
-    .all(companyId, companyId, companyId, order.id);
+      .all(row.id, companyId) as any[];
+    const addons = addonRows.map((a) => ({
+      addon_id: a.addon_id,
+      name: a.name ?? `Adicional #${a.addon_id}`,
+      quantity: a.quantity,
+      price_cents: a.price_cents,
+      total_cents: a.price_cents * a.quantity,
+    }));
+    const addonTotal = addons.reduce((sum, a) => sum + a.total_cents, 0);
+    const total_cents = row.quantity * row.price_cents + addonTotal * row.quantity;
+    return {
+      id: row.id,
+      order_id: row.order_id,
+      product_id: row.product_id,
+      quantity: row.quantity,
+      unit_price_cents: row.price_cents,
+      total_cents,
+      product_name: row.product_name ?? row.observation ?? "Item",
+      image_url: row.image_url,
+      observation: row.observation,
+      addons,
+    };
+  });
 
   res.json({ ...order, items });
 });
 
-const STATUS_FLOW = ["novo", "confirmado", "em_preparacao", "pronto", "entregue", "cancelado"];
+/* ------------------------- Mudança de status (painel) ------------------------- */
 
 interface OrderStatusResult {
   status: number;
   body: any;
 }
 
-function loadOrderWithItems(orderId: number, companyId: number) {
-  const order = db.prepare("SELECT * FROM orders WHERE id = ? AND company_id = ?").get(orderId, companyId) as any;
-  if (!order) return null;
-  const items = db
-    .prepare(
-      `SELECT oi.*, p.company_id AS product_company_id
-       FROM order_items oi
-       JOIN orders parent_order ON parent_order.id = oi.order_id AND parent_order.company_id = ?
-       JOIN products p ON p.id = oi.product_id
-       WHERE oi.order_id = ? AND oi.company_id = parent_order.company_id AND p.company_id = ?`
-    )
-    .all(companyId, orderId, companyId) as any[];
-  const variationItems = items.map((it) => {
-    const v = db
-      .prepare("SELECT company_id FROM product_variations WHERE id = ? AND company_id = ?")
-      .get(it.variation_id, companyId) as { company_id: number } | undefined;
-    return { ...it, variation_company_id: v?.company_id ?? null };
-  });
-  if (variationItems.length !== items.length) return null;
-  const mismatch = variationItems.some(
-    (it) => it.variation_company_id !== companyId || it.product_company_id !== companyId
-  );
-  if (mismatch) return null;
-  return { order, items };
-}
-
 function buildOrderResult(orderId: number, companyId: number) {
   return db.prepare("SELECT * FROM orders WHERE id = ? AND company_id = ?").get(orderId, companyId) as any;
 }
 
-router.patch("/:id/status", requireAuth, requireTenant, requireSubscriptionContext, (req: Request, res: Response) => {
+router.patch("/:id/status", requireAuth, requireTenant, (req: Request, res: Response) => {
   const companyId = (req.user as any).company_id;
-  const userId = (req.user as any).id;
   const orderId = Number(req.params.id);
   const target = req.body?.status;
   if (!ORDER_STATUSES.includes(target)) {
@@ -231,10 +379,9 @@ router.patch("/:id/status", requireAuth, requireTenant, requireSubscriptionConte
   }
 
   const tx = db.transaction((): OrderStatusResult => {
-    const loaded = loadOrderWithItems(orderId, companyId);
-    if (!loaded) return { status: 404, body: { error: "Pedido não encontrado." } };
+    const order = db.prepare("SELECT * FROM orders WHERE id = ? AND company_id = ?").get(orderId, companyId) as any;
+    if (!order) return { status: 404, body: { error: "Pedido não encontrado." } };
 
-    const order = loaded.order;
     const curIdx = STATUS_FLOW.indexOf(order.status);
     const tgtIdx = STATUS_FLOW.indexOf(target);
 
@@ -242,104 +389,13 @@ router.patch("/:id/status", requireAuth, requireTenant, requireSubscriptionConte
       return { status: 200, body: buildOrderResult(order.id, companyId) };
     }
 
-    const ts = now();
-
-    /* ------------------------- Cancelamento ------------------------- */
     if (target === "cancelado") {
-      if (order.status === "cancelado") {
-        return { status: 400, body: { error: "O pedido já foi cancelado." } };
-      }
-
       db.prepare("UPDATE orders SET status = 'cancelado' WHERE id = ? AND company_id = ?").run(order.id, companyId);
-
-      if (curIdx > STATUS_FLOW.indexOf("novo")) {
-        const refund = db.prepare(
-          `INSERT INTO stock_movements (variation_id, product_id, type, quantity, stock_before, stock_after, reason, user_id, company_id, sale_id, order_id, created_at)
-           VALUES (?, ?, 'entrada', ?, ?, ?, ?, ?, ?, NULL, ?, ?)`
-        );
-        for (const it of loaded.items) {
-          const v = db
-            .prepare("SELECT stock, company_id FROM product_variations WHERE id = ? AND company_id = ?")
-            .get(it.variation_id, companyId) as { stock: number; company_id: number } | undefined;
-          if (!v || v.company_id !== companyId) continue;
-          db.prepare("UPDATE product_variations SET stock = stock + ? WHERE id = ? AND company_id = ?").run(it.quantity, it.variation_id, companyId);
-          refund.run(
-            it.variation_id,
-            it.product_id,
-            it.quantity,
-            v.stock,
-            v.stock + it.quantity,
-            `Cancelamento de pedido #${String(order.id).padStart(4, "0")}`,
-            userId ?? null,
-            companyId,
-            order.id,
-            ts
-          );
-        }
-      }
-
       return { status: 200, body: buildOrderResult(order.id, companyId) };
     }
 
-    /* ------------------------- Avanço de status ------------------------- */
     if (tgtIdx !== curIdx + 1) {
       return { status: 400, body: { error: "Transição de status inválida para este pedido." } };
-    }
-
-    if (target === "confirmado") {
-      const fetched = loaded.items.map((it) => {
-        const v = db
-          .prepare(
-            `SELECT v.id, v.stock, v.company_id, p.company_id AS product_company_id,
-                    col.name AS color_name, s.name AS size_name
-             FROM product_variations v
-        JOIN products p ON p.id = v.product_id
-             JOIN colors col ON col.id = v.color_id
-             JOIN sizes s ON s.id = v.size_id
-             WHERE v.id = ? AND v.company_id = ? AND p.company_id = ?`
-          )
-          .get(it.variation_id, companyId, companyId) as any;
-        return { it, v };
-      });
-
-      const shortages = fetched
-        .filter(
-          (f) =>
-            !f.v ||
-            f.v.company_id !== companyId ||
-            f.v.product_company_id !== companyId ||
-            f.v.stock < f.it.quantity
-        )
-        .map((f) => {
-          if (!f.v || f.v.company_id !== companyId || f.v.product_company_id !== companyId) {
-            return `${f.it.product_name} — produto indisponível`;
-          }
-          return `${f.it.product_name} (${f.v.color_name}/${f.v.size_name}) — disponível: ${f.v.stock}`;
-        });
-
-      if (shortages.length > 0) {
-        return { status: 400, body: { error: "Estoque insuficiente para: " + shortages.join("; ") } };
-      }
-
-      const saleMovement = db.prepare(
-        `INSERT INTO stock_movements (variation_id, product_id, type, quantity, stock_before, stock_after, reason, user_id, company_id, sale_id, order_id, created_at)
-         VALUES (?, ?, 'venda_online', ?, ?, ?, ?, ?, ?, NULL, ?, ?)`
-      );
-      for (const f of fetched) {
-        db.prepare("UPDATE product_variations SET stock = stock - ? WHERE id = ? AND company_id = ?").run(f.it.quantity, f.it.variation_id, companyId);
-        saleMovement.run(
-          f.it.variation_id,
-          f.it.product_id,
-          f.it.quantity,
-          f.v.stock,
-          f.v.stock - f.it.quantity,
-          `Pedido online #${String(order.id).padStart(4, "0")}`,
-          userId ?? null,
-          companyId,
-          order.id,
-          ts
-        );
-      }
     }
 
     db.prepare("UPDATE orders SET status = ? WHERE id = ? AND company_id = ?").run(target, order.id, companyId);
