@@ -23,6 +23,7 @@
     "db:init:demo": "npm --prefix server run db:init:demo"
   },
   "devDependencies": {
-    "concurrently": "^9.0.0"
+    "concurrently": "^9.0.0",
+    "vitest": "^5.0.0"
   }
 }

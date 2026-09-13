@@ -19,8 +19,8 @@ function StoreHeader() {
   // Verificar status a cada minuto
   useEffect(() => {
     const checkStatus = () => {
-      if (store?.hours) {
-        setStatus(isBusinessOpen(store.hours));
+      if (store?.opening_hours) {
+        setStatus(isBusinessOpen(store.opening_hours));
       } else {
         setStatus("ERRO_CONFIGURACAO");
       }
@@ -28,14 +28,14 @@ function StoreHeader() {
     checkStatus();
     const interval = setInterval(checkStatus, 60000);
     return () => clearInterval(interval);
-  }, [store?.hours]);
+  }, [store?.opening_hours]);
 
   return (
     <header className="sticky top-0 z-40 border-b border-zinc-200 bg-white/95 backdrop-blur-sm shadow-sm">
       <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
         <Link to="/loja" className="flex min-w-0 items-center gap-3">
-          {store?.logo_url ? (
-            <img src={store.logo_url} alt={store.business_name} className="h-12 w-12 rounded-xl object-cover shadow-sm" />
+          {store?.store_logo_url ? (
+            <img src={store.store_logo_url} alt={store.store_name} className="h-12 w-12 rounded-xl object-cover shadow-sm" />
           ) : (
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-600 to-orange-600 text-white shadow-md shadow-amber-600/30">
               <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -44,7 +44,7 @@ function StoreHeader() {
             </div>
           )}
           <div className="min-w-0 leading-tight">
-            <p className="truncate font-display text-lg font-bold text-zinc-900">{store?.business_name ?? "Bruce Burguer"}</p>
+            <p className="truncate font-display text-lg font-bold text-zinc-900">{store?.store_name ?? "Bruce Burguer"}</p>
             <p className="truncate text-[11px] text-zinc-500">Hamburgueria Artesanal</p>
           </div>
         </Link>
@@ -112,10 +112,10 @@ export default function StoreLayout() {
       </main>
       <footer className="mx-auto max-w-5xl px-4 pt-10 pb-6 text-center">
         <div className="flex flex-wrap items-center justify-center gap-3 text-xs text-zinc-400">
-          {store?.address && <span>{[store.address, store.city, store.uf].filter(Boolean).join(", ")}</span>}
-          {store?.whatsapp && (
+          {store?.store_address && <span>{[store.store_address, store.store_city, store.store_state].filter(Boolean).join(", ")}</span>}
+          {store?.whatsapp_digits_only && (
             <a
-              href={`https://wa.me/${store.whatsapp.replace(/\D/g, "")}?text=${encodeURIComponent("Olá! Vim pelo cardápio da Bruce Burguer.")}`}
+              href={`https://wa.me/${store.whatsapp_digits_only.replace(/\D/g, "")}?text=${encodeURIComponent("Olá! Vim pelo cardápio da Bruce Burguer.")}`}
               target="_blank"
               rel="noreferrer"
               className="flex items-center gap-1 text-emerald-600 hover:underline"

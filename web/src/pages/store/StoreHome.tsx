@@ -3,10 +3,10 @@ import { Link, useNavigate } from "react-router-dom";
 import { Shirt, Search, Package, Coffee, UtensilsCrossed, Sparkles, Clock, CheckCircle, XCircle } from "lucide-react";
 import { api } from "../../api/client";
 import { useToast } from "../../context/ToastContext";
-import { Button, Card, Field, Input, PageHeader, PageLoader, Select, Skeleton, Textarea } from "../components/ui";
+import { Button, PageLoader, Skeleton } from "../../components/ui";
 import { money } from "../../lib/format";
-import { isBusinessOpen, getBusinessStatus } from "../../lib/businessHours";
-import type { StoreProduct, StoreCategory } from "../../types";
+import { isBusinessOpen } from "../../lib/businessHours";
+import type { StoreProduct, StoreInfo } from "../../types";
 
 interface StoreCategory {
   id: number;
@@ -21,10 +21,10 @@ export default function StoreHome() {
   const [cat, setCat] = useState<number | null>(null);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<"ABERTO" | "FECHADO" | "ERRO_CONFIGURACAO" | "CARREGANDO">("CARREGANDO");
-  const [store, setStore] = useState<{ business_name: string; slogan: string; address: string; city: string; uf: string; hours: string; logo_url: string } | null>(null);
+  const [store, setStore] = useState<StoreInfo | null>(null);
 
   useEffect(() => {
-    api.get<{ business_name: string; slogan: string; address: string; city: string; uf: string; hours: string; logo_url: string }>("/api/catalog/store")
+    api.get<StoreInfo>("/api/catalog/store")
       .then(setStore)
       .catch(() => null);
   }, []);
@@ -32,8 +32,8 @@ export default function StoreHome() {
   // Status ABERTO/FECHADO
   useEffect(() => {
     const checkStatus = () => {
-      if (store?.hours) {
-        setStatus(isBusinessOpen(store.hours));
+      if (store?.opening_hours) {
+        setStatus(isBusinessOpen(store.opening_hours));
       } else {
         setStatus("ERRO_CONFIGURACAO");
       }
@@ -44,17 +44,8 @@ export default function StoreHome() {
   }, [store?.opening_hours]);
 
   useEffect(() => {
-    api.get<any[]>("/api/catalog/combos").then(setCombos).catch(() => null);
-  }, []);
-
-  useEffect(() => {
     api.get<StoreCategory[]>("/api/catalog/categories").then(setCategories).catch(() => null);
   }, []);
-
-  useEffect(() => {
-    const t = window.setTimeout(load, search ? 300 : 0);
-    return () => window.clearTimeout(t);
-  }, [load]);
 
   // Mapear categoria para ícone
   const categoryIcons: Record<string, React.ReactNode> = {
@@ -209,10 +200,11 @@ export default function StoreHome() {
           {(() => {
             const productsByCategory = new Map<number, StoreProduct[]>();
             products.forEach(p => {
-              if (!productsByCategory.has(p.category_id)) {
-                productsByCategory.set(p.category_id, []);
+              const cid = p.category_id ?? 0;
+              if (!productsByCategory.has(cid)) {
+                productsByCategory.set(cid, []);
               }
-              productsByCategory.get(p.category_id)!.push(p);
+              productsByCategory.get(cid)!.push(p);
             });
 
             return Array.from(productsByCategory.entries())
@@ -278,7 +270,7 @@ export default function StoreHome() {
                     </div>
                   </section>
                 )
-              }));
+              });
             })()}
           </>
         )}

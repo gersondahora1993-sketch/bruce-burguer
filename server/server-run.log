@@ -1,8 +1,0 @@
-
-> nyellen-server@1.0.0 start
-> tsx src/index.ts
-
-[db] Arquivo do banco: C:\Users\gerso\nyellen-fashion\server\data\nyellen.db (padrão local — apenas desenvolvimento)
-✔ Uploads servidos de C:\Users\gerso\nyellen-fashion\server\uploads
-✔ Frontend servido de C:\Users\gerso\nyellen-fashion\web\dist
-✔ API Nyellen Fashion rodando em http://0.0.0.0:3001 (development)

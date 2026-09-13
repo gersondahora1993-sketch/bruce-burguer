@@ -186,11 +186,6 @@ function getNextStatusChange(
   return null;
 }
 
-function timeToMinutes(timeStr: string): number {
-  const [hours, minutes] = timeStr.split(":").map(Number);
-  return hours * 60 + minutes;
-}
-
 export default {
   isBusinessOpen,
   getBusinessStatus,

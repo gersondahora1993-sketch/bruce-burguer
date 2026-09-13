@@ -126,6 +126,10 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
   res.status(err.status ?? 500).json({ error: err?.message ?? "Erro interno do servidor." });
 });
 
-app.listen(env.port, env.host, () => {
-  console.log(`✔ API Nyellen Fashion rodando em http://${env.host}:${env.port} (${env.nodeEnv})`);
-});
+export { app };
+
+if (process.env.NODE_ENV !== "test") {
+  app.listen(env.port, env.host, () => {
+    console.log(`✔ API Nyellen Fashion rodando em http://${env.host}:${env.port} (${env.nodeEnv})`);
+  });
+}
