@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { ensureDefaultPlans, initSchema, migrateSchema, seed } from "./db.js";
-import { requireAuth, requireRole, requireSubscriptionContext, requireTenant } from "./auth.js";
+import { requireAuth, requireRole, requireTenant } from "./auth.js";
 import { env } from "./config.js";
 
 import authRoutes from "./routes/auth.js";
@@ -53,28 +53,27 @@ app.get("/api/health", (_req, res) => {
 
 app.use("/api/auth", authRoutes);
 app.use("/api/onboarding", onboardingRoutes);
-app.use("/api/billing", requireAuth, requireTenant, requireSubscriptionContext, requireRole("admin"), billingRoutes);
-app.use("/api/users", requireAuth, requireTenant, requireSubscriptionContext, requireRole("admin"), usersRoutes);
+app.use("/api/billing", requireAuth, requireTenant, requireRole("admin"), billingRoutes);
+app.use("/api/users", requireAuth, requireTenant, requireRole("admin"), usersRoutes);
 
 app.use("/api/catalog", catalogRoutes);
 app.use("/api/orders", ordersRoutes);
 app.use("/api/business-settings", requireAuth, requireTenant, businessSettingsRoutes);
-app.use("/api/categories", requireAuth, requireTenant, requireSubscriptionContext, categoriesRoutes);
-app.use("/api/products", requireAuth, requireTenant, requireSubscriptionContext, productsRoutes);
-app.use("/api/addons", requireAuth, requireTenant, requireSubscriptionContext, addonsRoutes);
-app.use("/api/combos", requireAuth, requireTenant, requireSubscriptionContext, combosRoutes);
-app.use("/api/colors", requireAuth, requireTenant, requireSubscriptionContext, colorsRoutes);
-app.use("/api/sizes", requireAuth, requireTenant, requireSubscriptionContext, sizesRoutes);
-app.use("/api/products", requireAuth, requireTenant, requireSubscriptionContext, productsRoutes);
-app.use("/api/stock", requireAuth, requireTenant, requireSubscriptionContext, stockRoutes);
-app.use("/api/sales", requireAuth, requireTenant, requireSubscriptionContext, salesRoutes);
-app.use("/api/customers", requireAuth, requireTenant, requireSubscriptionContext, customersRoutes);
-app.use("/api/reports", requireAuth, requireTenant, requireSubscriptionContext, reportsRoutes);
-app.use("/api/dashboard", requireAuth, requireTenant, requireSubscriptionContext, dashboardRoutes);
-app.use("/api/settings", requireAuth, requireTenant, requireSubscriptionContext, settingsRoutes);
-app.use("/api/receivables", requireAuth, requireTenant, requireSubscriptionContext, receivablesRoutes);
-app.use("/api/cash", requireAuth, requireTenant, requireSubscriptionContext, cashRoutes);
-app.use("/api/fiscal", requireAuth, requireTenant, requireSubscriptionContext, fiscalRoutes);
+app.use("/api/categories", requireAuth, requireTenant, categoriesRoutes);
+app.use("/api/products", requireAuth, requireTenant, productsRoutes);
+app.use("/api/addons", requireAuth, requireTenant, addonsRoutes);
+app.use("/api/combos", requireAuth, requireTenant, combosRoutes);
+app.use("/api/colors", requireAuth, requireTenant, colorsRoutes);
+app.use("/api/sizes", requireAuth, requireTenant, sizesRoutes);
+app.use("/api/stock", requireAuth, requireTenant, stockRoutes);
+app.use("/api/sales", requireAuth, requireTenant, salesRoutes);
+app.use("/api/customers", requireAuth, requireTenant, customersRoutes);
+app.use("/api/reports", requireAuth, requireTenant, reportsRoutes);
+app.use("/api/dashboard", requireAuth, requireTenant, dashboardRoutes);
+app.use("/api/settings", requireAuth, requireTenant, settingsRoutes);
+app.use("/api/receivables", requireAuth, requireTenant, receivablesRoutes);
+app.use("/api/cash", requireAuth, requireTenant, cashRoutes);
+app.use("/api/fiscal", requireAuth, requireTenant, fiscalRoutes);
 
 /* --------------------- Frontend estático (produção) --------------------- */
 

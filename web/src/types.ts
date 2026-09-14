@@ -249,9 +249,18 @@ export interface Order {
   notes: string;
   subtotal_cents: number;
   delivery_fee_cents: number;
-  payment_method: string;
+  discount_cents: number;
   total_cents: number;
+  payment_method: string;
+  change_for_cents: number | null;
   status: OrderStatus;
+  source: "online" | "presencial";
+  delivery_type: "entrega" | "retirada";
+  user_id: number | null;
+  user_name: string | null;
+  customer_id: number | null;
+  paid_at: string | null;
+  completed_at: string | null;
   created_at: string;
   item_count: number;
 }
@@ -268,6 +277,7 @@ export interface OrderItem {
   id: number;
   order_id: number;
   product_id: number | null;
+  combo_id: number | null;
   quantity: number;
   unit_price_cents: number;
   total_cents: number;

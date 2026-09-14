@@ -14,7 +14,7 @@ import Combos from "./pages/Combos";
 import Colors from "./pages/Colors";
 import Sizes from "./pages/Sizes";
 import Stock from "./pages/Stock";
-import SalesNew from "./pages/SalesNew";
+import CounterSale from "./pages/CounterSale";
 import SalesHistory from "./pages/SalesHistory";
 import SaleReceiptPage from "./pages/SaleReceipt";
 import Customers from "./pages/Customers";
@@ -100,7 +100,7 @@ export default function App() {
         <Route path="/stock" element={<Stock />} />
         <Route path="/stock/movements" element={<Stock tab="movements" />} />
         <Route path="/stock/low" element={<Stock tab="low" />} />
-        <Route path="/sales/new" element={<SalesNew />} />
+        <Route path="/sales/new" element={<CounterSale />} />
         <Route path="/sales" element={<SalesHistory />} />
         <Route path="/sales/:id/comprovante" element={<SaleReceiptPage />} />
         <Route path="/customers" element={<Customers />} />

@@ -39,6 +39,7 @@ export default function Orders() {
   const load = useCallback(async () => {
     try {
       const params = new URLSearchParams();
+      params.set("source", "online");
       if (search.trim()) params.set("search", search.trim());
       if (status !== "all") params.set("status", status);
       setOrders(await api.get<Order[]>(`/api/orders?${params.toString()}`));

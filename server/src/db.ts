@@ -160,10 +160,17 @@ CREATE TABLE IF NOT EXISTS orders (
   notes TEXT NOT NULL DEFAULT '',
   subtotal_cents INTEGER NOT NULL DEFAULT 0,
   delivery_fee_cents INTEGER NOT NULL DEFAULT 0,
+  discount_cents INTEGER NOT NULL DEFAULT 0,
   total_cents INTEGER NOT NULL DEFAULT 0,
   payment_method TEXT NOT NULL DEFAULT 'pix',
   change_for_cents INTEGER,
   status TEXT NOT NULL DEFAULT 'novo' CHECK(status IN ('novo','confirmado','em_preparacao','pronto','entregue','cancelado')),
+  source TEXT NOT NULL DEFAULT 'online',
+  delivery_type TEXT NOT NULL DEFAULT 'entrega',
+  user_id INTEGER,
+  customer_id INTEGER,
+  paid_at TEXT,
+  completed_at TEXT,
   company_id INTEGER DEFAULT 1,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -172,6 +179,7 @@ CREATE TABLE IF NOT EXISTS order_items (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   order_id INTEGER REFERENCES orders(id) ON DELETE CASCADE,
   product_id INTEGER REFERENCES products(id),
+  combo_id INTEGER,
   quantity INTEGER NOT NULL DEFAULT 1,
   price_cents INTEGER NOT NULL DEFAULT 0,
   observation TEXT NOT NULL DEFAULT '',
@@ -524,11 +532,34 @@ export function seed(): void {
 }
 
 export function migrateSchema(): void {
-  // Migration simplificada: schema novo criado por initSchema().
-  // Apenas garante bootstrap company e índices.
+  // Migration simplificada: schema novo criado por initSchema() (CREATE TABLE IF NOT EXISTS).
+  // Bancos existentes recebem colunas novas de forma idempotente (ALTER TABLE guiado por PRAGMA).
   ensureBootstrapCompany();
+  ensurePresencialColumns();
   ensureTenantIndexes();
   db.pragma("foreign_keys = ON");
+}
+
+function tableColumnNames(table: string): string[] {
+  return (db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]).map((c) => c.name);
+}
+
+function addColumnIfMissing(table: string, column: string, ddl: string): void {
+  if (tableColumnNames(table).some((c) => c === column)) return;
+  db.exec(`ALTER TABLE ${table} ADD COLUMN ${ddl}`);
+}
+
+// FASE 3A — Vendas presenciais: ordens ganham origem, responsável (funcionário),
+// cliente opcional (Fase 5), desconto, pagamento e conclusão; itens ganham combo_id.
+function ensurePresencialColumns(): void {
+  addColumnIfMissing("orders", "source", "source TEXT NOT NULL DEFAULT 'online'");
+  addColumnIfMissing("orders", "delivery_type", "delivery_type TEXT NOT NULL DEFAULT 'entrega'");
+  addColumnIfMissing("orders", "user_id", "user_id INTEGER");
+  addColumnIfMissing("orders", "customer_id", "customer_id INTEGER");
+  addColumnIfMissing("orders", "discount_cents", "discount_cents INTEGER NOT NULL DEFAULT 0");
+  addColumnIfMissing("orders", "paid_at", "paid_at TEXT");
+  addColumnIfMissing("orders", "completed_at", "completed_at TEXT");
+  addColumnIfMissing("order_items", "combo_id", "combo_id INTEGER");
 }
 
 export function ensureVariationBarcodes(opts?: { productId?: number; companyId?: number }): number {
@@ -552,8 +583,10 @@ function ensureTenantIndexes(): void {
     CREATE INDEX IF NOT EXISTS idx_delivery_areas_company ON delivery_areas(company_id);
     CREATE INDEX IF NOT EXISTS idx_orders_company ON orders(company_id);
     CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
+    CREATE INDEX IF NOT EXISTS idx_orders_source ON orders(source);
     CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id);
     CREATE INDEX IF NOT EXISTS idx_order_items_product ON order_items(product_id);
+    CREATE INDEX IF NOT EXISTS idx_order_items_combo ON order_items(combo_id);
     CREATE INDEX IF NOT EXISTS idx_order_item_addons_order ON order_item_addons(order_item_id);
     CREATE INDEX IF NOT EXISTS idx_order_item_addons_addon ON order_item_addons(addon_id);
     CREATE INDEX IF NOT EXISTS idx_business_settings_company ON business_settings(company_id);
