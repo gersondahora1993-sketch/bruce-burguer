@@ -59,7 +59,7 @@ export const env = {
   port: Number(readStr("PORT")) || 3001,
   host: readStr("HOST") || "0.0.0.0",
   jwtSecret: mustHave("JWT_SECRET", 32),
-  dbPath: readStr("DB_PATH"), // vazio = server/data/nyellen.db (apenas desenvolvimento)
+  dbPath: readStr("DB_PATH"), // vazio = data/bruce-burguer.db (apenas desenvolvimento)
   uploadsDir: readStr("UPLOADS_DIR") || path.resolve(process.cwd(), "uploads"), // fotos dos produtos
   dbInit: (readStr("DB_INIT") || (process.env.NODE_ENV === "production" ? "schema" : "demo")) as DbInitMode, // 'demo' (dev) | 'schema' (produção)
   corsOrigin: readStr("CORS_ORIGIN"), // vazio = liberado (dev); produção: https://seudominio.com
@@ -74,8 +74,8 @@ export const env = {
 if (env.isProduction && !env.dbPath) {
   throw new Error(
     "Produção exige DB_PATH: defina a variável de ambiente DB_PATH apontando para o arquivo " +
-      "persistente do banco (ex.: no Railway: DB_PATH=/data/nyellen.db com volume montado em /data). " +
-      "Sem ela o sistema usaria server/data/nyellen.db (banco demo de desenvolvimento)."
+      "persistente do banco (ex.: no Railway: DB_PATH=/data/bruce-burguer.db com volume montado em /data). " +
+      "Sem ela o sistema usaria data/bruce-burguer.db (banco demo de desenvolvimento)."
   );
 }
 

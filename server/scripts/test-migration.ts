@@ -61,7 +61,7 @@ function buildLegacyDb(dbPath: string, withCatalog: boolean) {
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
-    INSERT INTO companies (id, name, slug) VALUES (1, 'Nyellen Fashion', 'nyellen-fashion');
+    INSERT INTO companies (id, name, slug) VALUES (1, 'Bruce Burguer', 'bruce-burguer');
     CREATE TABLE categories (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
@@ -162,7 +162,7 @@ function foreignKeyViolations(dbPath: string): number {
 }
 
 async function main(): Promise<void> {
-  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "nyellen-migration-test-"));
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "bruce-burger-migration-test-"));
   try {
     let checks = 0;
     const pass = (condition: unknown, message: string) => {

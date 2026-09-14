@@ -243,7 +243,7 @@ function loadReceiptData(companyId: number, saleId: number): any {
   const roundingCents = Math.max(0, surchargeDiff - surchargeCents);
 
   const whatsappText =
-    `*${settings.store_name || "Nyellen Fashion"}*\n` +
+    `*${settings.store_name || "Bruce Burguer"}*\n` +
     `COMPROVANTE DE VENDA — NÃO É DOCUMENTO FISCAL\n\n` +
     `Venda: ${saleNumber}\n` +
     `Data: ${new Date(sale.created_at).toLocaleString("pt-BR")}\n` +
@@ -263,7 +263,7 @@ function loadReceiptData(companyId: number, saleId: number): any {
   return {
     store: {
       store_name: settings.store_name,
-      store_logo_url: settings.store_logo_url || "/logo/nyellen-fashion.png",
+      store_logo_url: settings.store_logo_url || "/logo/bruce-burguer.png",
       store_cnpj: settings.store_cnpj,
       store_phone: settings.store_phone,
       whatsapp_number: settings.whatsapp_number,
@@ -325,7 +325,7 @@ router.get("/:id/comprovante", requireAuth, (req: Request, res: Response) => {
 
 function receiptToPdfLines(data: any): PdfLine[] {
   const lines: PdfLine[] = [
-    { text: data.store.store_name || "Nyellen Fashion", bold: true, size: 16, align: "center" },
+    { text: data.store.store_name || "Bruce Burguer", bold: true, size: 16, align: "center" },
   ];
   if (data.store.store_cnpj) lines.push({ text: `CNPJ: ${data.store.store_cnpj}`, size: 9, align: "center" });
   if (data.store.store_phone) lines.push({ text: `Telefone: ${data.store.store_phone}`, size: 9, align: "center" });

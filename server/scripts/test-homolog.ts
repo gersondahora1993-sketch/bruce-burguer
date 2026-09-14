@@ -110,7 +110,7 @@ function plusDays(n: number): string {
 }
 
 async function main(): Promise<void> {
-  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "nyellen-homolog-"));
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "bruce-burger-homolog-"));
   const dbPath = path.join(tempDir, "homolog.db");
   const uploadsDir = path.join(tempDir, "uploads");
   let checks = 0;
@@ -160,9 +160,9 @@ async function main(): Promise<void> {
     pass(healthy, "API não iniciou no banco temporário");
 
     // ------------------------------ Logins ------------------------------
-    const rayaneLogin = await request(base, "POST", "/api/auth/login", { email: "raiani@nyellen.local", password: "Rayane@123" });
-    const amandaLogin = await request(base, "POST", "/api/auth/login", { email: "amanda@nyellen.local", password: "Amanda@123" });
-    const alanaLogin = await request(base, "POST", "/api/auth/login", { email: "alana@nyellen.local", password: "Alana@123" });
+    const rayaneLogin = await request(base, "POST", "/api/auth/login", { email: "raiani@bruce-burguer.local", password: "Rayane@123" });
+    const amandaLogin = await request(base, "POST", "/api/auth/login", { email: "amanda@bruce-burguer.local", password: "Amanda@123" });
+    const alanaLogin = await request(base, "POST", "/api/auth/login", { email: "alana@bruce-burguer.local", password: "Alana@123" });
     equal(rayaneLogin.status, 200, "login Rayane (admin)");
     equal(amandaLogin.status, 200, "login Amanda (funcionária)");
     equal(alanaLogin.status, 200, "login Alana (funcionária)");
@@ -171,8 +171,8 @@ async function main(): Promise<void> {
     const alana = alanaLogin.data.token as string;
 
     const dbIds = openDb(dbPath, true);
-    const amandaId = (dbIds.prepare("SELECT id FROM users WHERE email = 'amanda@nyellen.local'").get() as { id: number }).id;
-    const alanaId = (dbIds.prepare("SELECT id FROM users WHERE email = 'alana@nyellen.local'").get() as { id: number }).id;
+    const amandaId = (dbIds.prepare("SELECT id FROM users WHERE email = 'amanda@bruce-burguer.local'").get() as { id: number }).id;
+    const alanaId = (dbIds.prepare("SELECT id FROM users WHERE email = 'alana@bruce-burguer.local'").get() as { id: number }).id;
     dbIds.close();
 
     // --------------------- A. Rayane acessa módulos admin ---------------------

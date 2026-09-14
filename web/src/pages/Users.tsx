@@ -152,7 +152,7 @@ export default function Users() {
             <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Nome completo" />
           </Field>
           <Field label="E-mail de login" required>
-            <Input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="ex.: funcionaria@nyellen.local" />
+            <Input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="ex.: funcionaria@bruce-burguer.local" />
           </Field>
           <Field label="Perfil" required>
             <Select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as "admin" | "vendedora" | "funcionaria" })}>

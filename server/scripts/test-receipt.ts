@@ -85,7 +85,7 @@ function onboardingBody(slug: string, email: string, planId: number) {
 }
 
 async function main(): Promise<void> {
-  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "nyellen-receipt-test-"));
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "bruce-burger-receipt-test-"));
   const dbPath = path.join(tempDir, "receipt-test.db");
   let checks = 0;
   const pass = (condition: unknown, message: string) => {
@@ -133,9 +133,9 @@ async function main(): Promise<void> {
     pass(healthy, "API não iniciou no banco temporário com seed demo");
 
     // ------------------------------ Logins ------------------------------
-    const rayaneLogin = await request(base, "POST", "/api/auth/login", { email: "raiani@nyellen.local", password: "Rayane@123" });
-    const amandaLogin = await request(base, "POST", "/api/auth/login", { email: "amanda@nyellen.local", password: "Amanda@123" });
-    const alanaLogin = await request(base, "POST", "/api/auth/login", { email: "alana@nyellen.local", password: "Alana@123" });
+    const rayaneLogin = await request(base, "POST", "/api/auth/login", { email: "raiani@bruce-burguer.local", password: "Rayane@123" });
+    const amandaLogin = await request(base, "POST", "/api/auth/login", { email: "amanda@bruce-burguer.local", password: "Amanda@123" });
+    const alanaLogin = await request(base, "POST", "/api/auth/login", { email: "alana@bruce-burguer.local", password: "Alana@123" });
     equal(rayaneLogin.status, 200, "login Rayane");
     equal(amandaLogin.status, 200, "login Amanda");
     equal(alanaLogin.status, 200, "login Alana");
@@ -257,8 +257,8 @@ async function main(): Promise<void> {
     // Verifica no banco que user_id/company_id foram derivados do contexto
     {
       const dbv = openDb(dbPath, true);
-      const amandaDbId = (dbv.prepare("SELECT id FROM users WHERE email = 'amanda@nyellen.local'").get() as { id: number }).id;
-      const alanaDbId = (dbv.prepare("SELECT id FROM users WHERE email = 'alana@nyellen.local'").get() as { id: number }).id;
+      const amandaDbId = (dbv.prepare("SELECT id FROM users WHERE email = 'amanda@bruce-burguer.local'").get() as { id: number }).id;
+      const alanaDbId = (dbv.prepare("SELECT id FROM users WHERE email = 'alana@bruce-burguer.local'").get() as { id: number }).id;
       const rows = dbv.prepare("SELECT id, user_id, company_id FROM sales WHERE id IN (?, ?, ?, ?, ?)").all(pixId, dinheiroId, debitoId, creditoId, fiadoId) as { id: number; user_id: number | null; company_id: number }[];
       const amandaIds = [pixId, dinheiroId, fiadoId];
       const alanaIds = [debitoId, creditoId];

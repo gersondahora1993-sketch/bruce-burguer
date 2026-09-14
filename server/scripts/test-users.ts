@@ -95,7 +95,7 @@ function databaseSummary(dbPath: string) {
 }
 
 async function main(): Promise<void> {
-  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "nyellen-users-test-"));
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "bruce-burger-users-test-"));
   const dbPath = path.join(tempDir, "users-test.db");
   let checks = 0;
   const pass = (condition: unknown, message: string) => {
@@ -123,30 +123,30 @@ async function main(): Promise<void> {
       equal(count("users"), 4, "seed 2x deveria manter 4 usuários (admin + 3 da loja)");
       const emails = (db.prepare("SELECT email FROM users ORDER BY email").all() as { email: string }[]).map((r) => r.email);
       equal(
-        emails.filter((e) => e === "raiani@nyellen.local").length,
+        emails.filter((e) => e === "raiani@bruce-burguer.local").length,
         1,
-        "raiani@nyellen.local não deveria duplicar"
+        "raiani@bruce-burguer.local não deveria duplicar"
       );
       equal(
-        emails.filter((e) => e === "amanda@nyellen.local").length,
+        emails.filter((e) => e === "amanda@bruce-burguer.local").length,
         1,
-        "amanda@nyellen.local não deveria duplicar"
+        "amanda@bruce-burguer.local não deveria duplicar"
       );
       equal(
-        emails.filter((e) => e === "alana@nyellen.local").length,
+        emails.filter((e) => e === "alana@bruce-burguer.local").length,
         1,
-        "alana@nyellen.local não deveria duplicar"
+        "alana@bruce-burguer.local não deveria duplicar"
       );
       const store = db
         .prepare("SELECT email, role, company_id, password_hash FROM users WHERE email IN (?, ?, ?) ORDER BY email")
-        .all("raiani@nyellen.local", "amanda@nyellen.local", "alana@nyellen.local") as { email: string; role: string; company_id: number; password_hash: string }[];
+        .all("raiani@bruce-burguer.local", "amanda@bruce-burguer.local", "alana@bruce-burguer.local") as { email: string; role: string; company_id: number; password_hash: string }[];
       equal(store.length, 3, "os três usuários da loja deveriam existir");
       pass(store.every((u) => u.company_id === 1), "todos os usuários da loja deveriam ter company_id = 1");
       pass(store.every((u) => u.password_hash.startsWith("$2")), "senhas deveriam ser bcrypt hash");
-      pass(store.find((u) => u.email === "raiani@nyellen.local")?.role === "admin", "Raiani deveria ser admin");
+      pass(store.find((u) => u.email === "raiani@bruce-burguer.local")?.role === "admin", "Raiani deveria ser admin");
       pass(
-        store.find((u) => u.email === "amanda@nyellen.local")?.role === "vendedora" &&
-          store.find((u) => u.email === "alana@nyellen.local")?.role === "vendedora",
+        store.find((u) => u.email === "amanda@bruce-burguer.local")?.role === "vendedora" &&
+          store.find((u) => u.email === "alana@bruce-burguer.local")?.role === "vendedora",
         "Amanda e Alana deveriam ser vendedoras"
       );
       db.close();
@@ -198,17 +198,17 @@ async function main(): Promise<void> {
       // ------------------------------------------------------------------
       // TESTES 1-3 — Logins
       // ------------------------------------------------------------------
-      const rayaneLogin = await request(base, "POST", "/api/auth/login", { email: "raiani@nyellen.local", password: "Rayane@123" });
-      const amandaLogin = await request(base, "POST", "/api/auth/login", { email: "amanda@nyellen.local", password: "Amanda@123" });
-      const alanaLogin = await request(base, "POST", "/api/auth/login", { email: "alana@nyellen.local", password: "Alana@123" });
+      const rayaneLogin = await request(base, "POST", "/api/auth/login", { email: "raiani@bruce-burguer.local", password: "Rayane@123" });
+      const amandaLogin = await request(base, "POST", "/api/auth/login", { email: "amanda@bruce-burguer.local", password: "Amanda@123" });
+      const alanaLogin = await request(base, "POST", "/api/auth/login", { email: "alana@bruce-burguer.local", password: "Alana@123" });
       equal(rayaneLogin.status, 200, "1. Rayane consegue login");
       equal(amandaLogin.status, 200, "2. Amanda consegue login");
       equal(alanaLogin.status, 200, "3. Alana consegue login");
 
       // TESTES 4-5 — Credenciais inválidas
-      const wrongPassword = await request(base, "POST", "/api/auth/login", { email: "raiani@nyellen.local", password: "senha-errada" });
+      const wrongPassword = await request(base, "POST", "/api/auth/login", { email: "raiani@bruce-burguer.local", password: "senha-errada" });
       equal(wrongPassword.status, 401, "4. Senha incorreta bloqueia");
-      const noUser = await request(base, "POST", "/api/auth/login", { email: "naoexiste@nyellen.local", password: "qualquer123" });
+      const noUser = await request(base, "POST", "/api/auth/login", { email: "naoexiste@bruce-burguer.local", password: "qualquer123" });
       equal(noUser.status, 401, "5. Usuário inexistente bloqueia");
 
       // TESTES 6-8 — Roles
@@ -222,7 +222,7 @@ async function main(): Promise<void> {
 
       // TESTE 11 — role enviada pelo cliente é ignorada no login
       const roleInBodyLogin = await request(base, "POST", "/api/auth/login", {
-        email: "amanda@nyellen.local",
+        email: "amanda@bruce-burguer.local",
         password: "Amanda@123",
         role: "admin",
       });
@@ -233,12 +233,12 @@ async function main(): Promise<void> {
       const db = openDb(dbPath, true);
       const users = db
         .prepare("SELECT id, email, role, company_id FROM users WHERE email IN (?, ?, ?) ORDER BY email")
-        .all("raiani@nyellen.local", "amanda@nyellen.local", "alana@nyellen.local") as { id: number; email: string; role: string; company_id: number }[];
+        .all("raiani@bruce-burguer.local", "amanda@bruce-burguer.local", "alana@bruce-burguer.local") as { id: number; email: string; role: string; company_id: number }[];
       equal(users.length, 3, "deveriam existir 3 usuários da loja no banco");
       pass(users.every((u) => u.company_id === 1), "9. Usuários pertencem ao tenant correto");
-      const rayaneId = users.find((u) => u.email === "raiani@nyellen.local")!.id;
-      const amandaId = users.find((u) => u.email === "amanda@nyellen.local")!.id;
-      const alanaId = users.find((u) => u.email === "alana@nyellen.local")!.id;
+      const rayaneId = users.find((u) => u.email === "raiani@bruce-burguer.local")!.id;
+      const amandaId = users.find((u) => u.email === "amanda@bruce-burguer.local")!.id;
+      const alanaId = users.find((u) => u.email === "alana@bruce-burguer.local")!.id;
       db.close();
 
       // Me endpoint não expõe password_hash
@@ -397,8 +397,8 @@ async function main(): Promise<void> {
       equal((await request(base, "GET", "/api/reports", undefined, alanaToken)).status, 403, "33. Alana NÃO acessa relatórios financeiros");
       equal((await request(base, "GET", "/api/users", undefined, amandaToken)).status, 403, "34. Amanda NÃO gerencia usuários");
       equal((await request(base, "GET", "/api/users", undefined, alanaToken)).status, 403, "35. Alana NÃO gerencia usuários");
-      equal((await request(base, "POST", "/api/users", { name: "X", email: "x@nyellen.local", password: "123456" }, amandaToken)).status, 403, "funcionária não cria usuário");
-      equal((await request(base, "POST", "/api/users", { name: "X", email: "x@nyellen.local", password: "123456", role: "admin" }, alanaToken)).status, 403, "funcionária não cria usuário mesmo com role admin no body");
+      equal((await request(base, "POST", "/api/users", { name: "X", email: "x@bruce-burguer.local", password: "123456" }, amandaToken)).status, 403, "funcionária não cria usuário");
+      equal((await request(base, "POST", "/api/users", { name: "X", email: "x@bruce-burguer.local", password: "123456", role: "admin" }, alanaToken)).status, 403, "funcionária não cria usuário mesmo com role admin no body");
       equal((await request(base, "GET", "/api/billing/subscription", undefined, amandaToken)).status, 403, "funcionária NÃO acessa billing");
       equal((await request(base, "GET", "/api/billing/plans", undefined, alanaToken)).status, 403, "funcionária NÃO acessa billing/plans");
       equal((await request(base, "GET", "/api/fiscal/documents", undefined, amandaToken)).status, 403, "funcionária NÃO acessa documentos fiscais");
@@ -416,7 +416,7 @@ async function main(): Promise<void> {
       equal((await request(base, "GET", "/api/billing/plans", undefined, rayaneToken)).status, 200, "Rayane acessa billing");
 
       // Rayane gerencia usuários (criar, alterar role, desativar, resetar senha)
-      const created = await request(base, "POST", "/api/users", { name: "Teste Vendedora", email: "teste.func@nyellen.local", password: "teste123", role: "vendedora", company_id: 999 }, rayaneToken);
+      const created = await request(base, "POST", "/api/users", { name: "Teste Vendedora", email: "teste.func@bruce-burguer.local", password: "teste123", role: "vendedora", company_id: 999 }, rayaneToken);
       equal(created.status, 201, "Rayane cria usuário (company_id do body ignorado)");
       const newUserId = created.data.id as number;
       const newUserDb = openDb(dbPath, true);
@@ -436,13 +436,13 @@ async function main(): Promise<void> {
 
       const resetPw = await request(base, "POST", `/api/users/${newUserId}/password`, { password: "nova123" }, rayaneToken);
       equal(resetPw.status, 200, "Rayane redefine senha");
-      const loginAfterReset = await request(base, "POST", "/api/auth/login", { email: "teste.func@nyellen.local", password: "nova123" });
+      const loginAfterReset = await request(base, "POST", "/api/auth/login", { email: "teste.func@bruce-burguer.local", password: "nova123" });
       equal(loginAfterReset.status, 200, "login com a nova senha funciona");
       equal(loginAfterReset.data.user.role, "admin", "novo usuário acessa como admin após revalidação");
 
       const deactivateNew = await request(base, "PATCH", `/api/users/${newUserId}`, { active: false }, rayaneToken);
       equal(deactivateNew.status, 200, "Rayane desativa usuário");
-      const loginDeactivatedNew = await request(base, "POST", "/api/auth/login", { email: "teste.func@nyellen.local", password: "nova123" });
+      const loginDeactivatedNew = await request(base, "POST", "/api/auth/login", { email: "teste.func@bruce-burguer.local", password: "nova123" });
       equal(loginDeactivatedNew.status, 403, "usuário desativado não consegue login");
 
       // Auto-rebaixamento bloqueado
@@ -457,7 +457,7 @@ async function main(): Promise<void> {
       deactDb.close();
       const deactivated = await request(base, "GET", "/api/products", undefined, amandaToken);
       equal(deactivated.status, 401, "39. Usuário desativado perde acesso após revalidação");
-      const loginDeactivated = await request(base, "POST", "/api/auth/login", { email: "amanda@nyellen.local", password: "Amanda@123" });
+      const loginDeactivated = await request(base, "POST", "/api/auth/login", { email: "amanda@bruce-burguer.local", password: "Amanda@123" });
       equal(loginDeactivated.status, 403, "usuário desativado não consegue login");
 
       // ------------------------------------------------------------------

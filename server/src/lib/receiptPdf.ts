@@ -81,7 +81,7 @@ export function buildReceiptPdf(lines: PdfLine[]): Buffer {
   }
 
   const footerRows = rowify(
-    "Documento sem validade fiscal. Gerado pelo sistema Nyellen Fashion.",
+    "Documento sem validade fiscal. Gerado pelo sistema Bruce Burguer.",
     9,
     false,
     "left",

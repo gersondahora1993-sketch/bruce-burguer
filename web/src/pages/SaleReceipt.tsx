@@ -63,7 +63,7 @@ export default function SaleReceiptPage() {
     return response.blob();
   }
 
-  const LOGO_FALLBACK = "/logo/nyellen-fashion.png";
+  const LOGO_FALLBACK = "/logo/bruce-burguer.png";
 
   async function handlePrint() {
     const images = Array.from(document.querySelectorAll<HTMLImageElement>(".sale-receipt .receipt-logo"));
@@ -208,7 +208,7 @@ export default function SaleReceiptPage() {
               }}
             />
           ) : null}
-          <p className="font-display text-xl font-bold text-zinc-900">{data.store.store_name || "Nyellen Fashion"}</p>
+          <p className="font-display text-xl font-bold text-zinc-900">{data.store.store_name || "Bruce Burguer"}</p>
           {data.store.store_cnpj && (
             <p className="mt-0.5 flex items-center justify-center gap-1 text-xs text-zinc-500">
               <Building2 size={12} /> CNPJ: {data.store.store_cnpj}

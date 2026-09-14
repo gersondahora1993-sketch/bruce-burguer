@@ -1,4 +1,18 @@
-const TOKEN_KEY = "nyellen_token";
+const TOKEN_KEY = "bruce_burger_token";
+const LEGACY_TOKEN_KEY = "nyellen_token";
+let tokenMigrated = false;
+
+function migrateLegacyToken(): void {
+  if (tokenMigrated || typeof localStorage === "undefined") return;
+  tokenMigrated = true;
+  const current = localStorage.getItem(TOKEN_KEY);
+  if (current) return;
+  const legacy = localStorage.getItem(LEGACY_TOKEN_KEY);
+  if (legacy) {
+    localStorage.setItem(TOKEN_KEY, legacy);
+    localStorage.removeItem(LEGACY_TOKEN_KEY);
+  }
+}
 
 const API_BASE = (
   (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env?.VITE_API_URL ?? ""
@@ -13,15 +27,19 @@ export class ApiError extends Error {
 }
 
 export function getToken(): string | null {
+  migrateLegacyToken();
   return localStorage.getItem(TOKEN_KEY);
 }
 
 export function setToken(token: string): void {
+  migrateLegacyToken();
   localStorage.setItem(TOKEN_KEY, token);
+  localStorage.removeItem(LEGACY_TOKEN_KEY);
 }
 
 export function clearToken(): void {
   localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(LEGACY_TOKEN_KEY);
 }
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {

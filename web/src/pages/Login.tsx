@@ -39,7 +39,7 @@ export default function Login() {
             <Sparkles size={30} />
           </div>
           <h1 className="font-display text-3xl font-bold text-zinc-900">
-            Nyellen<span className="text-rose-600"> Fashion</span>
+            Bruce<span className="text-rose-600"> Burguer</span>
           </h1>
           <p className="text-sm text-zinc-500">Sistema de gestão da sua loja</p>
         </div>
@@ -69,7 +69,7 @@ export default function Login() {
             Entrar
           </Button>
           <p className="break-words rounded-lg bg-zinc-50 px-3 py-2 text-center text-xs text-zinc-500">
-            Acesso de demonstração: <span className="font-medium text-zinc-700">admin@nyellen.com</span> · senha{" "}
+            Acesso de demonstração: <span className="font-medium text-zinc-700">admin@bruceburguer.com</span> · senha{" "}
             <span className="font-medium text-zinc-700">admin123</span>
           </p>
           <p className="text-center text-sm text-zinc-500">

@@ -1,11 +1,11 @@
 {
-  "name": "nyellen-fashion",
+  "name": "bruce-burguer",
   "private": true,
   "version": "1.0.0",
   "engines": {
     "node": "22.x"
   },
-  "description": "Sistema de gestão da loja Nyellen Fashion",
+  "description": "Sistema de gestão da loja Bruce Burguer",
   "scripts": {
     "postinstall": "npm --prefix server install && npm --prefix web install",
     "setup": "npm --prefix server install && npm --prefix web install",

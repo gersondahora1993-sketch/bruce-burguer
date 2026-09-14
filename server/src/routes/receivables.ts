@@ -342,7 +342,7 @@ router.get("/:id/comprovante/:paymentId", requireAuth, (req: Request, res: Respo
     ...data,
     method_label: mLabel,
     whatsapp_text:
-      `*${data.store.store_name || "Nyellen Fashion"}*\n` +
+      `*${data.store.store_name || "Bruce Burguer"}*\n` +
       `Comprovante de recebimento\n\n` +
       `Cliente: ${data.receivable.customer_name || "-"}\n` +
       `Venda: #${String(data.receivable.sale_id).padStart(4, "0")}\n` +
@@ -366,7 +366,7 @@ router.get("/:id/comprovante/:paymentId/pdf", requireAuth, (req: Request, res: R
   const mLabel = methodLabel(data.payment.payment_method);
 
   const lines: PdfLine[] = [
-    { text: data.store.store_name || "Nyellen Fashion", bold: true, size: 16, align: "center" },
+    { text: data.store.store_name || "Bruce Burguer", bold: true, size: 16, align: "center" },
     { text: "COMPROVANTE DE RECEBIMENTO", bold: true, size: 13, align: "center", gap: 10 },
     { text: "", gap: 6 },
     { text: `Cliente: ${data.receivable.customer_name || "-"}` },

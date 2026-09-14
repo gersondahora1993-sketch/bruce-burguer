@@ -82,7 +82,7 @@ function expectedFinal(payment: string, subtotalCents: number): { surcharge: num
 }
 
 async function main(): Promise<void> {
-  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "nyellen-surcharge-"));
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "bruce-burger-surcharge-"));
   const dbPath = path.join(tempDir, "surcharge.db");
   let checks = 0;
   const pass = (condition: unknown, message: string) => {
@@ -131,7 +131,7 @@ async function main(): Promise<void> {
     pass(healthy, "API não iniciou no banco temporário");
 
     // ------------------------------ Login e base ------------------------------
-    const rayaneLogin = await request(base, "POST", "/api/auth/login", { email: "raiani@nyellen.local", password: "Rayane@123" });
+    const rayaneLogin = await request(base, "POST", "/api/auth/login", { email: "raiani@bruce-burguer.local", password: "Rayane@123" });
     equal(rayaneLogin.status, 200, "0a: login Rayane (admin)");
     const rayane = rayaneLogin.data.token as string;
 

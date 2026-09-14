@@ -102,7 +102,7 @@ function Logo() {
         <Sparkles size={20} />
       </div>
       <div className="leading-tight">
-        <p className="font-display text-lg font-bold text-zinc-900">Nyellen<span className="text-rose-600"> Fashion</span></p>
+        <p className="font-display text-lg font-bold text-zinc-900">Bruce<span className="text-rose-600"> Burguer</span></p>
         <p className="text-[11px] tracking-wide text-zinc-400">Gestão da loja</p>
       </div>
     </div>

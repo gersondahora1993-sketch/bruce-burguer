@@ -48,7 +48,7 @@ app.use(express.json({ limit: "20mb" }));
 app.use(express.raw({ type: ["image/jpeg", "image/png", "image/webp"], limit: "5mb" }));
 
 app.get("/api/health", (_req, res) => {
-  res.json({ ok: true, name: "Nyellen Fashion API", env: env.nodeEnv, time: new Date().toISOString() });
+  res.json({ ok: true, name: "Bruce Burguer API", env: env.nodeEnv, time: new Date().toISOString() });
 });
 
 app.use("/api/auth", authRoutes);
@@ -130,6 +130,6 @@ export { app };
 
 if (process.env.NODE_ENV !== "test") {
   app.listen(env.port, env.host, () => {
-    console.log(`✔ API Nyellen Fashion rodando em http://${env.host}:${env.port} (${env.nodeEnv})`);
+    console.log(`✔ API Bruce Burguer rodando em http://${env.host}:${env.port} (${env.nodeEnv})`);
   });
 }

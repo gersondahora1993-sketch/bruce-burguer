@@ -133,7 +133,7 @@ async function stopProcess(child: ReturnType<typeof spawn>): Promise<void> {
 }
 
 async function main(): Promise<void> {
-  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "nyellen-billing-test-"));
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "bruce-burger-billing-test-"));
   const dbPath = path.join(tempDir, "billing-test.db");
   const port = await freePort();
   const base = `http://127.0.0.1:${port}`;

@@ -6,8 +6,8 @@ import type { Request, Response } from "express";
 const router = Router();
 
 const DEFAULT_SETTINGS: Record<string, string> = {
-  store_name: "Nyellen Fashion",
-  store_logo_url: "/logo/nyellen-fashion.png",
+  store_name: "Bruce Burguer",
+  store_logo_url: "/logo/bruce-burguer.png",
   store_cnpj: "",
   store_phone: "",
   whatsapp_number: "",

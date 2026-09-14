@@ -88,7 +88,7 @@ export default function Onboarding() {
     <div className="min-h-screen bg-zinc-100 px-4 py-8 sm:px-6">
       <div className="mx-auto max-w-3xl">
         <div className="mb-6 text-center">
-          <p className="text-xs font-semibold uppercase tracking-widest text-rose-600">Nyellen Fashion SaaS</p>
+          <p className="text-xs font-semibold uppercase tracking-widest text-rose-600">Bruce Burguer SaaS</p>
           <h1 className="mt-2 font-display text-3xl font-bold text-zinc-900">Comece seu trial de 30 dias</h1>
           <p className="mt-2 text-sm text-zinc-500">Crie sua empresa e o primeiro administrador.</p>
         </div>

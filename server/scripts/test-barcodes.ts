@@ -101,7 +101,7 @@ function digitsOf(value: string): string {
 }
 
 async function main(): Promise<void> {
-  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "nyellen-barcodes-test-"));
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "bruce-burger-barcodes-test-"));
   const dbPath = path.join(tempDir, "barcodes-test.db");
   const port = await freePort();
   const base = `http://127.0.0.1:${port}`;

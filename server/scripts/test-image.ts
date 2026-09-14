@@ -110,7 +110,7 @@ function webpBytes(): Buffer {
 }
 
 async function main(): Promise<void> {
-  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "nyellen-image-test-"));
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "bruce-burger-image-test-"));
   const dbPath = path.join(tempDir, "image-test.db");
   const uploadsDir = path.join(tempDir, "uploads");
   let checks = 0;
@@ -164,9 +164,9 @@ async function main(): Promise<void> {
     pass(healthy, "API não iniciou no banco temporário com seed demo");
 
     // ------------------------------ Logins ------------------------------
-    const rayaneLogin = await request(base, "POST", "/api/auth/login", { email: "raiani@nyellen.local", password: "Rayane@123" });
-    const amandaLogin = await request(base, "POST", "/api/auth/login", { email: "amanda@nyellen.local", password: "Amanda@123" });
-    const alanaLogin = await request(base, "POST", "/api/auth/login", { email: "alana@nyellen.local", password: "Alana@123" });
+    const rayaneLogin = await request(base, "POST", "/api/auth/login", { email: "raiani@bruce-burguer.local", password: "Rayane@123" });
+    const amandaLogin = await request(base, "POST", "/api/auth/login", { email: "amanda@bruce-burguer.local", password: "Amanda@123" });
+    const alanaLogin = await request(base, "POST", "/api/auth/login", { email: "alana@bruce-burguer.local", password: "Alana@123" });
     equal(rayaneLogin.status, 200, "login Rayane");
     equal(amandaLogin.status, 200, "login Amanda");
     equal(alanaLogin.status, 200, "login Alana");

@@ -79,7 +79,7 @@ function onboardingBody(slug: string, email: string, planId: number) {
 }
 
 async function main(): Promise<void> {
-  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "nyellen-delivery-"));
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "bruce-burger-delivery-"));
   const dbPath = path.join(tempDir, "delivery.db");
   let checks = 0;
   const pass = (condition: unknown, message: string) => {
@@ -128,9 +128,9 @@ async function main(): Promise<void> {
     pass(healthy, "API não iniciou no banco temporário");
 
     // ------------------------------ Logins e identidade ------------------------------
-    const raianiLogin = await request(base, "POST", "/api/auth/login", { email: "raiani@nyellen.local", password: "Rayane@123" });
-    const amandaLogin = await request(base, "POST", "/api/auth/login", { email: "amanda@nyellen.local", password: "Amanda@123" });
-    const alanaLogin = await request(base, "POST", "/api/auth/login", { email: "alana@nyellen.local", password: "Alana@123" });
+    const raianiLogin = await request(base, "POST", "/api/auth/login", { email: "raiani@bruce-burguer.local", password: "Rayane@123" });
+    const amandaLogin = await request(base, "POST", "/api/auth/login", { email: "amanda@bruce-burguer.local", password: "Amanda@123" });
+    const alanaLogin = await request(base, "POST", "/api/auth/login", { email: "alana@bruce-burguer.local", password: "Alana@123" });
     equal(raianiLogin.status, 200, "login Raiani (administradora)");
     equal(amandaLogin.status, 200, "login Amanda (vendedora)");
     equal(alanaLogin.status, 200, "login Alana (vendedora)");
@@ -141,16 +141,16 @@ async function main(): Promise<void> {
     equal(raianiLogin.data.user.role, "admin", "Raiani é admin");
     equal(amandaLogin.data.user.role, "vendedora", "Amanda é vendedora");
     equal(alanaLogin.data.user.role, "vendedora", "Alana é vendedora");
-    equal((await request(base, "POST", "/api/auth/login", { email: "raiane@nyellen.local", password: "Rayane@123" })).status, 401, "e-mail antigo da Raiani não faz mais login");
+    equal((await request(base, "POST", "/api/auth/login", { email: "raiane@bruce-burguer.local", password: "Rayane@123" })).status, 401, "e-mail antigo da Raiani não faz mais login");
 
     const dbIds = openDb(dbPath, true);
-    const amandaId = (dbIds.prepare("SELECT id FROM users WHERE email = 'amanda@nyellen.local'").get() as { id: number }).id;
-    const alanaId = (dbIds.prepare("SELECT id FROM users WHERE email = 'alana@nyellen.local'").get() as { id: number }).id;
+    const amandaId = (dbIds.prepare("SELECT id FROM users WHERE email = 'amanda@bruce-burguer.local'").get() as { id: number }).id;
+    const alanaId = (dbIds.prepare("SELECT id FROM users WHERE email = 'alana@bruce-burguer.local'").get() as { id: number }).id;
     dbIds.close();
 
     // ------------------------------ 1/2. Raiani: administrativo + financeiro ------------------------------
     equal((await request(base, "GET", "/api/users", undefined, raiani)).status, 200, "1a. Raiani acessa administração (usuários)");
-    equal((await request(base, "PUT", "/api/settings", { store_name: "Nyellen Fashion" }, raiani)).status, 200, "1b. Raiani acessa configurações");
+    equal((await request(base, "PUT", "/api/settings", { store_name: "Bruce Burguer" }, raiani)).status, 200, "1b. Raiani acessa configurações");
     equal((await request(base, "GET", "/api/receivables", undefined, raiani)).status, 200, "2a. Raiani acessa contas a receber");
     equal((await request(base, "GET", "/api/reports", undefined, raiani)).status, 200, "2b. Raiani acessa relatórios financeiros");
     equal((await request(base, "GET", "/api/billing/plans", undefined, raiani)).status, 200, "2c. Raiani acessa billing");

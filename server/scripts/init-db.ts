@@ -48,7 +48,7 @@ function main(): void {
   console.log(`[db:init] DB_PATH do ambiente: ${env.dbPath ? `"${env.dbPath}"` : "(não definido)"}`);
   if (env.isProduction && !env.dbPath) {
     fail(
-      "Produção exige DB_PATH definido no ambiente (ex.: Railway: DB_PATH=/data/nyellen.db). " +
+      "Produção exige DB_PATH definido no ambiente (ex.: Railway: DB_PATH=/data/bruce-burguer.db). " +
         "Verifique se a variável está configurada no serviço/ambiente correto — o processo atual não a recebeu."
     );
   }

@@ -1,4 +1,4 @@
-# 🚀 Nyellen Fashion — Guia de Produção
+# 🚀 Bruce Burguer — Guia de Produção
 
 Este documento explica exatamente como levar o sistema da demonstração para produção:
 
@@ -8,7 +8,7 @@ variáveis de ambiente, criação segura do banco, build, execução e publicaç
 
 ## 1. Conceitos importantes
 
-- **`server/data/nyellen.db` é o banco DEMO** (desenvolvimento). Ele é criado automaticamente
+- **`server/data/bruce-burguer.db` é o banco DEMO** (desenvolvimento). Ele é criado automaticamente
   na primeira execução em modo demo, com produtos, clientes e vendas de exemplo.
 - **Em produção o sistema NUNCA cria dados de demonstração**, mesmo que o banco esteja vazio.
 - **O banco demo não deve ser usado em produção**: crie um banco de produção separado
@@ -26,7 +26,7 @@ Modelo: `server/.env.example` (copie para `server/.env`).
 | `PORT` | não | Porta da API (padrão 3001) |
 | `HOST` | não | Host (padrão `0.0.0.0`) |
 | `JWT_SECRET` | **sim** | Assina os tokens (mín. 32 caracteres). Gerar: `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"` |
-| `DB_PATH` | não | Caminho do banco SQLite. Vazio = `server/data/nyellen.db` (demo) |
+| `DB_PATH` | não | Caminho do banco SQLite. Vazio = `server/data/bruce-burguer.db` (demo) |
 | `DB_INIT` | não | `demo` (dev) ou `schema` (produção) |
 | `CORS_ORIGIN` | sim* | Domínio(s) do frontend em produção, separados por vírgula (*em produção) |
 | `PUBLIC_URL` | não | URL pública do sistema (links externos futuros) |
@@ -47,8 +47,8 @@ Passo a passo de dentro da pasta do servidor:
 #    ADMIN_PASSWORD=uma-senha-forte
 
 # 2. Apontar DB_PATH para um banco NOVO (nunca o demo):
-#    DB_PATH=C:/dados/nyellen-producao.db      (Windows)
-#    DB_PATH=/var/lib/nyellen/nyellen.db       (Linux)
+#    DB_PATH=C:/dados/bruce-burguer-producao.db      (Windows)
+#    DB_PATH=/var/lib/bruce-burguer/bruce-burguer.db       (Linux)
 
 # 3. Criar o banco (schema + usuário admin)
 npm run db:init
@@ -103,7 +103,7 @@ npm run dev            # API :3001 + front :5173 (Vite com proxy)
 **Produção** (servidor Linux — ex.: Ubuntu + Node 20):
 
 ```bash
-cd /opt/nyellen
+cd /opt/bruce-burguer
 npm ci                    # instala as versões exatas
 npm run build             # web/dist + server/dist
 
@@ -139,7 +139,7 @@ server {
   listen 80;
   server_name loja.seudominio.com;
 
-  root /opt/nyellen/web/dist;
+  root /opt/bruce-burguer/web/dist;
   index index.html;
 
   # SPA: repassa as rotas do frontend para o index
@@ -158,7 +158,7 @@ server {
 }
 ```
 
-4. **Supervisão**: `pm2 start server/dist/index.js --name nyellen-api` (ou systemd).
+4. **Supervisão**: `pm2 start server/dist/index.js --name bruce-burguer-api` (ou systemd).
 5. **CORS**: defina `CORS_ORIGIN=https://loja.seudominio.com` no `.env` da produção.
 6. **Firewall/hosting**: libere apenas 80/443 para o público; a API fica interna.
 
@@ -207,7 +207,7 @@ Frontend (Railway static)  ──VITE_API_URL──▶  Backend (Railway web, No
                                                         │ DB_PATH
                                                         ▼
                                                Volume persistente /data
-                                                 (arquivo nyellen.db)
+                                                 (arquivo bruce-burguer.db)
 ```
 
 O frontend acessa a API por **URL configurável** (`VITE_API_URL`, compilada no bundle;
@@ -227,7 +227,7 @@ deploy, o fluxo recomendado é: criar o backend primeiro, copiar a URL dele para
    |---|---|
    | `NODE_ENV` | `production` |
    | `JWT_SECRET` | valor forte (≥32 caracteres) — NUNCA o do desenvolvimento |
-   | `DB_PATH` | `/data/nyellen.db` |
+   | `DB_PATH` | `/data/bruce-burguer.db` |
    | `CORS_ORIGIN` | URL do frontend (passo 2, ex.: `https://seu-front.up.railway.app`) |
    | `ADMIN_EMAIL` | e-mail do administrador (usada só no primeiro `db:init`) |
    | `ADMIN_PASSWORD` | senha forte do administrador (usada só no primeiro `db:init`) |
@@ -235,14 +235,14 @@ deploy, o fluxo recomendado é: criar o backend primeiro, copiar a URL dele para
    > `PORT` e `HOST` não precisam ser definidas: o Railway injeta `PORT` e o padrão já é `0.0.0.0`.
 
 5. **Volume persistente**: no serviço, `Volumes > Mount` → path **`/data`**.
-   É o único jeito de o SQLite sobreviver a redeploys. O banco demo (`server/data/nyellen.db`)
-   **não** é usado: com `DB_PATH=/data/nyellen.db` o sistema abre um arquivo novo e vazio na
+   É o único jeito de o SQLite sobreviver a redeploys. O banco demo (`server/data/bruce-burguer.db`)
+   **não** é usado: com `DB_PATH=/data/bruce-burguer.db` o sistema abre um arquivo novo e vazio na
    primeira execução (schema criado automaticamente, **sem** dados de demonstração).
 6. Deploy → depois, no terminal do serviço (Railway shell) ou via CLI, crie o administrador:
    ```bash
    npm run db:init
    # saída esperada:
-   # [db:init] Banco: /data/nyellen.db
+   # [db:init] Banco: /data/bruce-burguer.db
    # [db:init] Usuário administrador criado: <ADMIN_EMAIL>
    # [db:init] Banco de produção pronto.
    ```
@@ -253,7 +253,7 @@ deploy, o fluxo recomendado é: criar o backend primeiro, copiar a URL dele para
    > **Se o `db:init` reclamar que `DB_PATH` não está definido**: as variáveis do serviço não
    > chegaram ao processo (ex.: o comando foi rodado em outro serviço/shell, ou as variáveis
    > foram criadas depois do deploy). O sistema **aborta** nesse caso em vez de criar o banco
-   > no caminho padrão efêmero (`/app/server/data/nyellen.db`), que se perderia no redeploy.
+   > no caminho padrão efêmero (`/app/server/data/bruce-burguer.db`), que se perderia no redeploy.
    > Verifique o início do log — `[db:init] DB_PATH do ambiente: ...` e o status de
    > `ADMIN_EMAIL`/`ADMIN_PASSWORD` — e rode o comando no **Railway shell do próprio serviço**
    > (Settings → shell), que herda as variáveis do ambiente do deploy atual.
@@ -281,9 +281,9 @@ deploy, o fluxo recomendado é: criar o backend primeiro, copiar a URL dele para
 ### Observações Railway
 
 - **Sessões**: trocar `JWT_SECRET` invalida os logins de todos (comportamento esperado).
-- **Backups**: faça backup do volume `/data/nyellen.db` (conteúdo = todos os dados).
+- **Backups**: faça backup do volume `/data/bruce-burguer.db` (conteúdo = todos os dados).
 - **Domínio próprio**: aponte um domínio customizado nos dois serviços (ou só no frontend,
   mantendo `VITE_API_URL` e `CORS_ORIGIN` atualizadas com o domínio final).
-- **Banco demo**: o arquivo `server/data/nyellen.db` do repositório é usado apenas em
+- **Banco demo**: o arquivo `server/data/bruce-burguer.db` do repositório é usado apenas em
   desenvolvimento (`DB_INIT=demo`). Em `NODE_ENV=production` o seed de demonstração é
   bloqueado pelo código e a execução **aborta sem `DB_PATH`** (nunca usa o caminho padrão).

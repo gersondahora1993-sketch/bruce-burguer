@@ -1,6 +1,6 @@
-# 👗 Nyellen Fashion — Sistema de Gestão
+# 🍔 Bruce Burguer — Sistema de Gestão
 
-Sistema completo de gestão para loja de roupas: produtos, variações (cor + tamanho com estoque individual), estoque com movimentações, vendas com baixa automática, clientes, relatórios, dashboard e WhatsApp.
+Sistema completo de gestão para hamburgueria: produtos, adicionais, combos, loja online com pedidos, estoque com movimentações, vendas, clientes, relatórios, dashboard e WhatsApp.
 
 ## Stack
 
@@ -8,7 +8,7 @@ Sistema completo de gestão para loja de roupas: produtos, variações (cor + ta
 |---|---|
 | Frontend | React 18 + TypeScript + Vite + Tailwind CSS 4 + Recharts |
 | API | Node + Express + TypeScript (tsx) |
-| Banco de dados | SQLite (`better-sqlite3`, arquivo em `server/data/nyellen.db`) |
+| Banco de dados | SQLite (`better-sqlite3`, arquivo em `server/data/bruce-burguer.db`) |
 | Autenticação | JWT (senhas com bcrypt) |
 
 > **Sobre o Supabase:** a arquitetura é toda separada entre camada de API (`server/src/routes`) e UI (`web/src`). Para migrar ao Supabase, basta trocar os `db.prepare(...)` do servidor por queries do Supabase — nenhuma credencial está embutida no frontend. Onde as credenciais seriam adicionadas: `server/.env` (substituindo o SQLite) e `web/.env` apenas para itens públicos (como `VITE_SUPABASE_URL`).
@@ -45,10 +45,10 @@ npm run dev:web   # Frontend na porta 5173 (com proxy para a API)
 
 | Campo | Valor |
 |---|---|
-| E-mail | `admin@nyellen.com` |
+| E-mail | `admin@bruceburguer.com` |
 | Senha | `admin123` |
 
-O banco `server/data/nyellen.db` é o **banco DEMO**, criado automaticamente na primeira
+O banco `server/data/bruce-burguer.db` é o **banco DEMO**, criado automaticamente na primeira
 execução **em desenvolvimento** (`DB_INIT=demo`). Em produção o seed de demonstração é
 **sempre bloqueado**; o banco de produção é criado com `npm run db:init`
 (detalhes em `docs/PRODUCAO.md`). Para recomeçar a demo do zero, apague a pasta
@@ -71,7 +71,7 @@ execução **em desenvolvimento** (`DB_INIT=demo`). Em produção o seed de demo
 ## Estrutura
 
 ```
-nyellen-fashion/
+bruce-burguer/
 ├─ server/            # API Express + SQLite
 │  └─ src/
 │     ├─ index.ts     # bootstrap

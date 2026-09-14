@@ -182,7 +182,7 @@ export default function ReceiptModal({
             {data.store.store_logo_url ? (
               <img src={data.store.store_logo_url} alt="Logo" className="mx-auto mb-2 h-12 object-contain" />
             ) : null}
-            <p className="font-display text-lg font-bold text-zinc-900">{data.store.store_name || "Nyellen Fashion"}</p>
+            <p className="font-display text-lg font-bold text-zinc-900">{data.store.store_name || "Bruce Burguer"}</p>
             <p className="text-xs tracking-wide text-zinc-500 uppercase">Comprovante de recebimento</p>
           </div>
 

@@ -80,7 +80,7 @@ function plusDays(n: number): string {
 }
 
 async function main(): Promise<void> {
-  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "nyellen-receivables-"));
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "bruce-burger-receivables-"));
   const dbPath = path.join(tempDir, "receivables.db");
   let checks = 0;
   const pass = (condition: unknown, message: string) => {
@@ -129,12 +129,12 @@ async function main(): Promise<void> {
     pass(healthy, "API não iniciou no banco temporário");
 
     // ------------------------------ 1. Login da Rayane ------------------------------
-    const rayaneLogin = await request(base, "POST", "/api/auth/login", { email: "raiani@nyellen.local", password: "Rayane@123" });
+    const rayaneLogin = await request(base, "POST", "/api/auth/login", { email: "raiani@bruce-burguer.local", password: "Rayane@123" });
     equal(rayaneLogin.status, 200, "1: login Rayane (admin)");
     const rayane = rayaneLogin.data.token as string;
 
     const dbIds = openDb(dbPath, true);
-    const rayaneId = (dbIds.prepare("SELECT id FROM users WHERE email = 'raiani@nyellen.local'").get() as { id: number }).id;
+    const rayaneId = (dbIds.prepare("SELECT id FROM users WHERE email = 'raiani@bruce-burguer.local'").get() as { id: number }).id;
     dbIds.close();
 
     // ------------------------------ 2. Cliente ------------------------------
