@@ -100,6 +100,8 @@ CREATE TABLE IF NOT EXISTS products (
   sale_price_cents INTEGER NOT NULL DEFAULT 0,
   image_url TEXT NOT NULL DEFAULT '',
   active INTEGER NOT NULL DEFAULT 1,
+  stock INTEGER NOT NULL DEFAULT 0,
+  min_stock INTEGER NOT NULL DEFAULT 0,
   company_id DEFAULT 1,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -194,6 +196,21 @@ CREATE TABLE IF NOT EXISTS order_item_addons (
   quantity INTEGER NOT NULL DEFAULT 1,
   price_cents INTEGER NOT NULL DEFAULT 0,
   company_id DEFAULT 1,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS stock_movements (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  company_id INTEGER DEFAULT 1,
+  product_id INTEGER REFERENCES products(id),
+  type TEXT NOT NULL CHECK(type IN ('entrada','saida','ajuste','venda','estorno')),
+  quantity INTEGER NOT NULL CHECK(quantity > 0),
+  stock_before INTEGER NOT NULL,
+  stock_after INTEGER NOT NULL,
+  reason TEXT NOT NULL DEFAULT '',
+  reference_type TEXT,
+  reference_id INTEGER,
+  user_id INTEGER REFERENCES users(id),
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -358,7 +375,7 @@ export function seed(): void {
     const existing = db.prepare("SELECT id FROM products WHERE name = ? AND company_id = ?").get(h.name, BOOTSTRAP_COMPANY_ID);
     if (!existing) {
       const info = db.prepare(
-        "INSERT INTO products (name, description, category_id, sale_price_cents, image_url, active, company_id, created_at) VALUES (?, ?, ?, ?, '', 1, ?, ?)"
+        "INSERT INTO products (name, description, category_id, sale_price_cents, image_url, active, company_id, created_at, stock, min_stock) VALUES (?, ?, ?, ?, '', 1, ?, ?, 100, 0)"
       ).run(h.name, h.desc, catHamburgueres, h.price, BOOTSTRAP_COMPANY_ID, ts);
       const productId = Number(info.lastInsertRowid);
       // Relacionar adicionais aplicáveis a todos os hambúrgueres
@@ -377,7 +394,7 @@ export function seed(): void {
   ];
   for (const p of porcoes) {
     db.prepare(
-      "INSERT OR IGNORE INTO products (name, description, category_id, sale_price_cents, image_url, active, company_id, created_at) VALUES (?, ?, ?, ?, '', 1, ?, ?)"
+      "INSERT OR IGNORE INTO products (name, description, category_id, sale_price_cents, image_url, active, company_id, created_at, stock, min_stock) VALUES (?, ?, ?, ?, '', 1, ?, ?, 100, 0)"
     ).run(p.name, p.desc, catPorcoes, p.price, BOOTSTRAP_COMPANY_ID, ts);
   }
 
@@ -391,7 +408,7 @@ export function seed(): void {
   ];
   for (const b of bebidas) {
     db.prepare(
-      "INSERT OR IGNORE INTO products (name, description, category_id, sale_price_cents, image_url, active, company_id, created_at) VALUES (?, ?, ?, ?, '', 1, ?, ?)"
+      "INSERT OR IGNORE INTO products (name, description, category_id, sale_price_cents, image_url, active, company_id, created_at, stock, min_stock) VALUES (?, ?, ?, ?, '', 1, ?, ?, 100, 0)"
     ).run(b.name, b.desc, catBebidas, b.price, BOOTSTRAP_COMPANY_ID, ts);
   }
 
@@ -406,13 +423,13 @@ export function seed(): void {
   ];
   for (const m of miniSalgadinhos) {
     db.prepare(
-      "INSERT OR IGNORE INTO products (name, description, category_id, sale_price_cents, image_url, active, company_id, created_at) VALUES (?, ?, ?, ?, '', 1, ?, ?)"
+      "INSERT OR IGNORE INTO products (name, description, category_id, sale_price_cents, image_url, active, company_id, created_at, stock, min_stock) VALUES (?, ?, ?, ?, '', 1, ?, ?, 100, 0)"
     ).run(m.name, m.desc, catMiniSalgadinhos, m.price, BOOTSTRAP_COMPANY_ID, ts);
   }
 
   // NOVIDADE (1)
   db.prepare(
-    "INSERT OR IGNORE INTO products (name, description, category_id, sale_price_cents, image_url, active, company_id, created_at) VALUES (?, ?, ?, ?, '', 1, ?, ?)"
+    "INSERT OR IGNORE INTO products (name, description, category_id, sale_price_cents, image_url, active, company_id, created_at, stock, min_stock) VALUES (?, ?, ?, ?, '', 1, ?, ?, 100, 0)"
   ).run(
     "PARMEGIANA DE FILÉ DE FRANGO EMPANADA",
     "Filé de frango empanado, coberto com queijo/molho, acompanhado de arroz e batata. Serve 2 pessoas.",
@@ -536,6 +553,7 @@ export function migrateSchema(): void {
   // Bancos existentes recebem colunas novas de forma idempotente (ALTER TABLE guiado por PRAGMA).
   ensureBootstrapCompany();
   ensurePresencialColumns();
+  ensureStockColumns();
   ensureTenantIndexes();
   db.pragma("foreign_keys = ON");
 }
@@ -560,6 +578,13 @@ function ensurePresencialColumns(): void {
   addColumnIfMissing("orders", "paid_at", "paid_at TEXT");
   addColumnIfMissing("orders", "completed_at", "completed_at TEXT");
   addColumnIfMissing("order_items", "combo_id", "combo_id INTEGER");
+}
+
+// FASE 4B — Estoque por produto: produtos ganham estoque, estoque mínimo e
+// histórico de movimentações (stock_movements).
+function ensureStockColumns(): void {
+  addColumnIfMissing("products", "stock", "stock INTEGER NOT NULL DEFAULT 0");
+  addColumnIfMissing("products", "min_stock", "min_stock INTEGER NOT NULL DEFAULT 0");
 }
 
 export function ensureVariationBarcodes(opts?: { productId?: number; companyId?: number }): number {
@@ -589,6 +614,9 @@ function ensureTenantIndexes(): void {
     CREATE INDEX IF NOT EXISTS idx_order_items_combo ON order_items(combo_id);
     CREATE INDEX IF NOT EXISTS idx_order_item_addons_order ON order_item_addons(order_item_id);
     CREATE INDEX IF NOT EXISTS idx_order_item_addons_addon ON order_item_addons(addon_id);
+    CREATE INDEX IF NOT EXISTS idx_stock_movements_company_product ON stock_movements(company_id, product_id);
+    CREATE INDEX IF NOT EXISTS idx_stock_movements_reference ON stock_movements(reference_type, reference_id);
+    CREATE INDEX IF NOT EXISTS idx_stock_movements_company_created ON stock_movements(company_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_business_settings_company ON business_settings(company_id);
   `);
 }

@@ -38,6 +38,8 @@ export default function ProductForm() {
   const [imageUrl, setImageUrl] = useState("");
   const [active, setActive] = useState(true);
   const [addonIds, setAddonIds] = useState<number[]>([]);
+  const [stock, setStock] = useState("");
+  const [minStock, setMinStock] = useState("");
   const [errors, setErrors] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
@@ -59,6 +61,8 @@ export default function ProductForm() {
           setImageUrl(p.image_url || "");
           setActive(p.active === 1);
           setAddonIds((p.addons ?? []).map((a: Addon) => a.id));
+          setStock(p.stock != null ? String(p.stock) : "");
+          setMinStock(p.min_stock != null ? String(p.min_stock) : "");
         }
       } catch (err: any) {
         toastError(err?.message ?? "Não foi possível carregar os dados.");
@@ -83,7 +87,7 @@ export default function ProductForm() {
       return;
     }
 
-    const payload = {
+    const payload: Record<string, unknown> = {
       name: name.trim(),
       description: description.trim(),
       category_id: Number(categoryId),
@@ -92,6 +96,13 @@ export default function ProductForm() {
       active: active ? 1 : 0,
       addon_ids: addonIds,
     };
+    if (!isEdit) {
+      payload.stock = Number(stock) || 0;
+      payload.min_stock = Number(minStock) || 0;
+    }
+    if (isEdit && minStock !== "") {
+      payload.min_stock = Number(minStock);
+    }
 
     setSaving(true);
     try {
@@ -179,17 +190,40 @@ export default function ProductForm() {
               </Field>
             </div>
 
-            <div className="sm:col-span-2">
-              <Field label="Descrição">
-                <Textarea
-                  rows={3}
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Descrição do produto (ingredientes, detalhes...)"
+              <div className="sm:col-span-2">
+                <Field label="Descrição">
+                  <Textarea
+                    rows={3}
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Descrição do produto (ingredientes, detalhes...)"
+                  />
+                </Field>
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Estoque inicial" hint="Quantidade em unidades ao criar o produto">
+                <Input
+                  type="number"
+                  min="0"
+                  value={stock}
+                  onChange={(e) => setStock(e.target.value)}
+                  placeholder="0"
+                  inputMode="numeric"
+                />
+              </Field>
+              <Field label="Estoque mínimo" hint="Alerta quando o estoque atingir este valor">
+                <Input
+                  type="number"
+                  min="0"
+                  value={minStock}
+                  onChange={(e) => setMinStock(e.target.value)}
+                  placeholder="0"
+                  inputMode="numeric"
                 />
               </Field>
             </div>
-          </div>
 
           <div className="mt-4 flex items-center gap-3">
             <Toggle checked={active} onChange={setActive} />

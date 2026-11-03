@@ -1,64 +1,65 @@
 import { Router } from "express";
-import { db, now } from "../db.js";
-import { requireAuth } from "../auth.js";
+import { db } from "../db.js";
+import { requireAuth, requireRole } from "../auth.js";
+import {
+  adjustStock,
+  MANUAL_MOVEMENT_TYPES,
+  STOCK_MOVEMENT_TYPES,
+  type StockMovementType,
+} from "../lib/stock.js";
 import type { Request, Response } from "express";
+
+// FASE 4B — API de estoque por produto (sem variações de produto).
 
 const router = Router();
 
-const VARIATION_SELECT = `
-  SELECT v.id, v.product_id, v.color_id, v.size_id, v.stock, v.min_stock, v.barcode,
-         p.name AS product_name, p.sku, p.sale_price_cents, p.image_url,
-         p.category_id, c.name AS category_name,
-         col.name AS color_name, col.hex AS color_hex,
-         s.name AS size_name
-  FROM product_variations v
-  JOIN products p ON p.id = v.product_id
-   JOIN colors col ON col.id = v.color_id AND col.company_id = p.company_id
-   JOIN sizes s ON s.id = v.size_id AND s.company_id = p.company_id
-   LEFT JOIN categories c ON c.id = p.category_id AND c.company_id = p.company_id
-`;
-
-function stockStatus(v: { stock: number; min_stock: number }): "out" | "low" | "ok" {
-  if (v.stock <= 0) return "out";
-  if (v.stock <= v.min_stock) return "low";
+function stockStatus(stock: number, min_stock: number): "out" | "low" | "ok" {
+  if (stock <= 0) return "out";
+  if (stock <= min_stock) return "low";
   return "ok";
 }
 
+// GET /api/stock — resumo de estoque dos produtos da empresa
 router.get("/", requireAuth, (req: Request, res: Response) => {
-  const { search, category_id, color_id, size_id, status } = req.query;
-  const where: string[] = [];
-  const params: (string | number)[] = [];
   const companyId = (req.user as any).company_id;
-  where.push("p.company_id = ? AND v.company_id = ?");
-  params.push(companyId, companyId);
+  const { search, category_id, status } = req.query;
+  const where: string[] = ["p.company_id = ?"];
+  const params: (string | number)[] = [companyId];
 
   if (search && String(search).trim()) {
-    where.push("(p.name LIKE ? OR p.sku LIKE ? OR v.barcode LIKE ?)");
+    where.push("(p.name LIKE ? OR p.description LIKE ?)");
     const term = `%${String(search).trim()}%`;
-    params.push(term, term, term);
+    params.push(term, term);
   }
   if (category_id && Number(category_id) > 0) {
     where.push("p.category_id = ?");
     params.push(Number(category_id));
   }
-  if (color_id && Number(color_id) > 0) {
-    where.push("v.color_id = ?");
-    params.push(Number(color_id));
-  }
-  if (size_id && Number(size_id) > 0) {
-    where.push("v.size_id = ?");
-    params.push(Number(size_id));
-  }
 
   const rows = db
     .prepare(
-      `${VARIATION_SELECT} ${where.length ? "WHERE " + where.join(" AND ") : ""} ORDER BY p.category_id, p.name, s.sort_order, col.name`
+      `SELECT p.id AS product_id, p.name AS product_name, p.description,
+              p.category_id, c.name AS category_name, p.sale_price_cents, p.image_url,
+              p.active, p.stock, p.min_stock
+       FROM products p
+       LEFT JOIN categories c ON c.id = p.category_id AND c.company_id = p.company_id
+       WHERE ${where.join(" AND ")}
+       ORDER BY c.name, p.name COLLATE NOCASE`
     )
     .all(...params) as any[];
 
   let result = rows.map((r) => ({
-    ...r,
-    status: stockStatus(r),
+    product_id: r.product_id,
+    product_name: r.product_name,
+    description: r.description,
+    category_id: r.category_id,
+    category_name: r.category_name,
+    sale_price_cents: r.sale_price_cents,
+    image_url: r.image_url,
+    active: r.active,
+    stock: r.stock,
+    min_stock: r.min_stock,
+    status: stockStatus(r.stock, r.min_stock),
     stock_value_cents: r.stock * r.sale_price_cents,
   }));
 
@@ -69,121 +70,114 @@ router.get("/", requireAuth, (req: Request, res: Response) => {
   res.json(result);
 });
 
+// GET /api/stock/low — produtos em estoque baixo ou zerado (ativo apenas)
 router.get("/low", requireAuth, (req: Request, res: Response) => {
   const companyId = (req.user as any).company_id;
   const rows = db
-    .prepare(`${VARIATION_SELECT} WHERE p.company_id = ? AND v.company_id = ? AND v.stock <= v.min_stock ORDER BY v.stock ASC`)
-    .all(companyId, companyId) as any[];
-  res.json(rows.map((r) => ({ ...r, status: stockStatus(r), stock_value_cents: r.stock * r.sale_price_cents })));
+    .prepare(
+      `SELECT p.id AS product_id, p.name AS product_name, p.sale_price_cents, p.image_url,
+              p.active, p.stock, p.min_stock
+       FROM products p
+       WHERE p.company_id = ? AND p.active = 1 AND p.stock <= p.min_stock
+       ORDER BY p.stock ASC`
+    )
+    .all(companyId) as any[];
+  res.json(
+    rows.map((r) => ({
+      ...r,
+      status: stockStatus(r.stock, r.min_stock),
+      stock_value_cents: r.stock * r.sale_price_cents,
+    }))
+  );
 });
 
+// GET /api/stock/movements — histórico de movimentações (separado por tenant)
 router.get("/movements", requireAuth, (req: Request, res: Response) => {
-  const { limit, type } = req.query;
   const companyId = (req.user as any).company_id;
+  const { limit, type, product_id } = req.query;
   const cap = Math.min(500, Math.max(1, Number(limit) || 200));
-  const allowed = ["entrada", "saida", "ajuste", "venda_online"];
-  const where = allowed.includes(String(type))
-    ? "WHERE m.company_id = ? AND p.company_id = ? AND v.company_id = ? AND m.type = ?"
-    : "WHERE m.company_id = ? AND p.company_id = ? AND v.company_id = ?";
-  const params: (string | number)[] = [companyId, companyId, companyId];
-  if (allowed.includes(String(type))) params.push(String(type));
+
+  const where: string[] = ["m.company_id = ?"];
+  const params: (string | number)[] = [companyId];
+  if (type && STOCK_MOVEMENT_TYPES.includes(String(type) as StockMovementType)) {
+    where.push("m.type = ?");
+    params.push(String(type));
+  }
+  if (product_id && Number(product_id) > 0) {
+    where.push("m.product_id = ?");
+    params.push(Number(product_id));
+  }
+
   const rows = db
     .prepare(
-      `SELECT m.id, m.variation_id, m.product_id, m.type, m.quantity, m.stock_before, m.stock_after, m.reason, m.user_id, m.sale_id, m.order_id, m.created_at,
-              p.name AS product_name, col.name AS color_name, s.name AS size_name, u.name AS user_name
+      `SELECT m.id, m.product_id, m.type, m.quantity, m.stock_before, m.stock_after,
+              m.reason, m.reference_type, m.reference_id, m.user_id, m.created_at,
+              p.name AS product_name, u.name AS user_name
        FROM stock_movements m
-       JOIN products p ON p.id = m.product_id
-       JOIN product_variations v ON v.id = m.variation_id
-       JOIN colors col ON col.id = v.color_id
-       JOIN sizes s ON s.id = v.size_id
+       LEFT JOIN products p ON p.id = m.product_id AND p.company_id = m.company_id
        LEFT JOIN users u ON u.id = m.user_id
-       ${where}
+       WHERE ${where.join(" AND ")}
        ORDER BY m.id DESC
        LIMIT ?`
     )
     .all(...params, cap);
+
   res.json(rows);
 });
 
-router.post("/movements", requireAuth, (req: Request, res: Response) => {
+// POST /api/stock/movements — movimentação manual (somente admin; entrada/saida/ajuste)
+router.post("/movements", requireAuth, requireRole("admin"), (req: Request, res: Response) => {
   const companyId = (req.user as any).company_id;
-  const { variation_id, type, quantity, reason } = req.body ?? {};
+  const userId = (req.user as any).id ?? null;
+  const body = req.body ?? {};
+  const { product_id, type } = body;
 
-  if (!variation_id || !["entrada", "saida", "ajuste"].includes(type)) {
-    res.status(400).json({ error: "Dados inválidos para a movimentação." });
+  const pid = Number(product_id);
+  if (!Number.isInteger(pid) || pid <= 0) {
+    res.status(400).json({ error: "Produto inválido para a movimentação." });
+    return;
+  }
+  if (!MANUAL_MOVEMENT_TYPES.includes(type)) {
+    res.status(400).json({ error: "Tipo de movimentação inválido para uso manual (use entrada, saida ou ajuste)." });
     return;
   }
 
-  const variation = db
-    .prepare(
-      `SELECT v.id, v.product_id, v.stock, v.company_id, p.company_id AS product_company_id
-       FROM product_variations v JOIN products p ON p.id = v.product_id
-       WHERE v.id = ? AND v.company_id = ? AND p.company_id = ?`
-    )
-    .get(Number(variation_id), companyId, companyId) as { id: number; product_id: number; stock: number; company_id: number; product_company_id: number } | undefined;
+  const reason = typeof body.reason === "string" ? body.reason.trim().slice(0, 255) : "";
 
-  if (!variation) {
-    res.status(404).json({ error: "Variação não encontrada." });
-    return;
-  }
-
-  const qty = Number(quantity);
-  if (!Number.isInteger(qty)) {
-    res.status(400).json({ error: "Quantidade inválida." });
-    return;
-  }
-
-  let movementQty = 0;
-  let stockAfter = variation.stock;
-
-  if (type === "entrada") {
-    if (qty <= 0) {
-      res.status(400).json({ error: "A entrada deve ser maior que zero." });
+  let targetStock: number | undefined;
+  let quantity = 0;
+  if (type === "ajuste") {
+    const t = Number(body.target_stock);
+    if (!Number.isInteger(t) || t < 0) {
+      res.status(400).json({ error: "Para o ajuste informe o estoque-alvo (target_stock) não negativo." });
       return;
     }
-    movementQty = qty;
-    stockAfter = variation.stock + qty;
-  } else if (type === "saida") {
-    if (qty <= 0) {
-      res.status(400).json({ error: "A saída deve ser maior que zero." });
-      return;
-    }
-    if (qty > variation.stock) {
-      res.status(400).json({ error: "Estoque insuficiente para esta saída." });
-      return;
-    }
-    movementQty = qty;
-    stockAfter = variation.stock - qty;
+    targetStock = t;
   } else {
-    if (qty < 0) {
-      res.status(400).json({ error: "O estoque ajustado não pode ser negativo." });
+    const q = Number(body.quantity);
+    if (!Number.isInteger(q) || q <= 0) {
+      res.status(400).json({ error: "A quantidade da movimentação deve ser um inteiro positivo." });
       return;
     }
-    movementQty = qty - variation.stock;
-    stockAfter = qty;
+    quantity = q;
   }
 
-  const tx = db.transaction(() => {
-    db.prepare("UPDATE product_variations SET stock = ? WHERE id = ? AND company_id = ?").run(stockAfter, variation.id, companyId);
-    db.prepare(
-      `INSERT INTO stock_movements (variation_id, product_id, type, quantity, stock_before, stock_after, reason, user_id, company_id, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run(
-      variation.id,
-      variation.product_id,
-      type,
-      movementQty,
-      variation.stock,
-      stockAfter,
-      typeof reason === "string" ? reason.trim() : "",
-      req.user?.id ?? null,
-      companyId,
-      now()
-    );
-  });
-
-  tx();
-  res.status(201).json({ ok: true });
+  try {
+    db.transaction(() => {
+      adjustStock({
+        companyId,
+        productId: pid,
+        type,
+        quantity,
+        targetStock,
+        reason,
+        userId,
+      });
+    })();
+    res.status(201).json({ ok: true });
+  } catch (err: any) {
+    res.status(400).json({ error: err?.message ?? "Não foi possível registrar a movimentação." });
+  }
 });
 
 export default router;

@@ -14,11 +14,11 @@ import {
   LABEL_WIDTH_MM,
   parseLabelItems,
 } from "../lib/labels";
-import type { Product, Variation } from "../types";
+import type { Product } from "../types";
 
 interface LabelData {
   product: Product;
-  variation: Variation;
+  code: string;
 }
 
 export default function LabelsPage() {
@@ -40,11 +40,10 @@ export default function LabelsPage() {
     if (!products) return [];
     const out: LabelData[] = [];
     for (const entry of entries) {
-      const product = products.find((p) => p.variations.some((v) => v.id === entry.variationId));
+      const product = products.find((p) => p.id === entry.productId);
       if (!product) continue;
-      const variation = product.variations.find((v) => v.id === entry.variationId);
-      if (!variation || !variation.barcode) continue;
-      for (let i = 0; i < entry.quantity; i++) out.push({ product, variation });
+      const code = String(product.id);
+      for (let i = 0; i < entry.quantity; i++) out.push({ product, code });
     }
     return out;
   }, [products, entries]);
@@ -135,24 +134,20 @@ export default function LabelsPage() {
               <p className="line-clamp-2 text-center font-sans text-[8px] font-semibold leading-[1.15]">
                 {l.product.name}
               </p>
-              <p className="mt-[1px] text-center text-[7px] leading-[1.2] text-zinc-500">
-                {l.variation.color_name}
-                {l.variation.size_name ? ` · ${l.variation.size_name}` : ""}
-              </p>
               <p className="mt-[1px] text-center font-display text-[13px] font-bold leading-[1.1]">
                 {money(l.product.sale_price_cents)}
               </p>
               <div
                 className="label-barcode flex min-h-0 flex-1 items-center justify-center"
                 dangerouslySetInnerHTML={{
-                  __html: code128Svg(String(l.variation.barcode), {
+                  __html: code128Svg(l.code, {
                     moduleWidth: BARCODE_MODULE_WIDTH,
                     height: BARCODE_HEIGHT_PX,
                   }),
                 }}
               />
               <p className="mt-[1px] line-clamp-1 text-center font-mono text-[7.5px] leading-[1.2] tracking-widest">
-                {l.variation.barcode}
+                {l.code}
               </p>
             </div>
           ))}

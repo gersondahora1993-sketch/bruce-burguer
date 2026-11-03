@@ -38,37 +38,37 @@ try {
   pass(LABEL_CONTENT_HEIGHT_MM > 0 && LABEL_CONTENT_HEIGHT_MM < LABEL_HEIGHT_MM, "altura útil dentro dos 40 mm");
   pass(BARCODE_WIDTH_MM > 0 && BARCODE_WIDTH_MM <= LABEL_CONTENT_WIDTH_MM, "barcode cabe na largura útil da etiqueta");
   pass(BARCODE_QUIET_MODULES >= 10, `zona de silêncio >= 10 módulos (atual: ${BARCODE_QUIET_MODULES})`);
-  pass(MAX_QUANTITY === 99, "quantidade máxima por variação é 99");
+  pass(MAX_QUANTITY === 99, "quantidade máxima por produto é 99");
 
   // ---- 2. parseLabelItems ----
   pass(parseLabelItems(null).length === 0, "null => nenhuma etiqueta");
   pass(parseLabelItems("").length === 0, "string vazia => nenhuma etiqueta");
   assert.deepEqual(parseLabelItems("7:3,8:2"), [
-    { variationId: 7, quantity: 3 },
-    { variationId: 8, quantity: 2 },
+    { productId: 7, quantity: 3 },
+    { productId: 8, quantity: 2 },
   ]);
   pass(true, "parse '7:3,8:2' => [{7,3},{8,2}]");
-  assert.deepEqual(parseLabelItems("7:0"), [{ variationId: 7, quantity: 1 }]);
+  assert.deepEqual(parseLabelItems("7:0"), [{ productId: 7, quantity: 1 }]);
   pass(true, "quantidade 0 é normalizada para 1");
-  assert.deepEqual(parseLabelItems("7:150"), [{ variationId: 7, quantity: MAX_QUANTITY }]);
+  assert.deepEqual(parseLabelItems("7:150"), [{ productId: 7, quantity: MAX_QUANTITY }]);
   pass(true, `quantidade > ${MAX_QUANTITY} é limitada para ${MAX_QUANTITY}`);
-  assert.deepEqual(parseLabelItems("7:abc"), [{ variationId: 7, quantity: 1 }]);
+  assert.deepEqual(parseLabelItems("7:abc"), [{ productId: 7, quantity: 1 }]);
   pass(true, "quantidade inválida cai para 1");
-  assert.deepEqual(parseLabelItems("x:1, 9:2"), [{ variationId: 9, quantity: 2 }]);
-  pass(true, "variação inválida é ignorada");
+  assert.deepEqual(parseLabelItems("x:1, 9:2"), [{ productId: 9, quantity: 2 }]);
+  pass(true, "produto inválido é ignorado");
   assert.deepEqual(parseLabelItems("5:1,,6:2,"), [
-    { variationId: 5, quantity: 1 },
-    { variationId: 6, quantity: 2 },
+    { productId: 5, quantity: 1 },
+    { productId: 6, quantity: 2 },
   ]);
   pass(true, "partes vazias (separadores) são ignoradas");
 
-  // ---- 3. Uma etiqueta por variação × quantidade (impressão em lote) ----
+  // ---- 3. Uma etiqueta por produto × quantidade (impressão em lote) ----
   const entries = parseLabelItems("7:3,8:2");
   pass(countLabelCopies(entries) === 5, `lote '7:3,8:2' => 5 etiquetas (${countLabelCopies(entries)})`);
   pass(countLabelCopies([]) === 0, "lote vazio => 0 etiquetas");
   pass(
     countLabelCopies(parseLabelItems("1:1,2:1,3:1")) === 3,
-    "lote individual (1 por variação) => uma etiqueta por variação"
+    "lote individual (1 por produto) => uma etiqueta por produto"
   );
 
   // ---- 4. Métricas do barcode (esforço de leitura) ----

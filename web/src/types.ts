@@ -14,89 +14,52 @@ export interface Category {
   created_at: string;
 }
 
-export interface Color {
+export interface Category {
   id: number;
   name: string;
-  hex: string;
   active: number;
   created_at: string;
 }
 
-export interface Size {
-  id: number;
-  name: string;
-  sort_order: number;
-  active: number;
-  created_at: string;
-}
-
-export interface Variation {
-  id: number;
-  product_id: number;
-  color_id: number;
-  size_id: number;
-  stock: number;
-  min_stock: number;
-  barcode: string;
-  color_name: string;
-  size_name: string;
-}
-
+// ============================================================
+// MODELO MODERNO — estoque por produto (products.stock)
+// ============================================================
 export interface Product {
   id: number;
   name: string;
-  sku: string;
   description: string;
   category_id: number | null;
   category_name: string;
-  cost_price_cents: number;
   sale_price_cents: number;
   image_url: string;
   active: boolean;
   created_at: string;
-  total_stock: number;
-  stock_value_cents: number;
-  variations: Variation[];
-}
-
-export interface ProductInput {
-  name: string;
-  sku: string;
-  description: string;
-  category_id: number | null;
-  cost_price_cents: number;
-  sale_price_cents: number;
-  image_url: string;
-  active: boolean;
-  variations: { color_id: number; size_id: number; stock: number; min_stock: number }[];
+  stock: number;
+  min_stock: number;
 }
 
 export interface StockItem {
-  id: number;
   product_id: number;
-  color_id: number;
-  size_id: number;
+  product_name: string;
+  description: string | null;
+  category_id: number | null;
+  category_name: string | null;
+  sale_price_cents: number;
+  image_url: string | null;
+  active: number;
   stock: number;
   min_stock: number;
-  barcode: string;
-  product_name: string;
-  sku: string;
-  sale_price_cents: number;
-  image_url: string;
-  category_id: number | null;
-  category_name: string;
-  color_name: string;
-  color_hex: string;
-  size_name: string;
   status: "out" | "low" | "ok";
   stock_value_cents: number;
 }
 
+export type StockMovementType = "entrada" | "saida" | "ajuste" | "venda" | "estorno";
+
 export interface StockMovement {
   id: number;
-  variation_id: number;
   product_id: number;
-  type: "entrada" | "saida" | "ajuste" | "venda_online";
+  product_name: string;
+  type: StockMovementType;
   quantity: number;
   stock_before: number;
   stock_after: number;
@@ -105,10 +68,9 @@ export interface StockMovement {
   user_name: string | null;
   sale_id: number | null;
   order_id: number | null;
+  reference_type: string | null;
+  reference_id: number | null;
   created_at: string;
-  product_name: string;
-  color_name: string;
-  size_name: string;
 }
 
 export interface Sale {
@@ -503,9 +465,6 @@ export interface ReportData {
     rows: {
       id: number;
       product_name: string;
-      sku: string;
-      color_name: string;
-      size_name: string;
       stock: number;
       min_stock: number;
       sale_price_cents: number;

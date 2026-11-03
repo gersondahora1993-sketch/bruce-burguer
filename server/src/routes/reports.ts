@@ -60,7 +60,6 @@ router.get("/", requireAuth, (req: Request, res: Response) => {
         FROM sale_items si
         JOIN (SELECT id, created_at, company_id FROM sales s ${clause}) s ON s.id = si.sale_id
         JOIN products p ON p.id = si.product_id AND p.company_id = s.company_id
-        JOIN product_variations v ON v.id = si.variation_id AND v.company_id = s.company_id
          LEFT JOIN categories c ON c.id = p.category_id AND c.company_id = s.company_id
        WHERE 1=1 ${itemClause}
        ORDER BY si.id DESC`
@@ -91,7 +90,6 @@ router.get("/", requireAuth, (req: Request, res: Response) => {
         FROM sale_items si
         JOIN (SELECT id, company_id FROM sales s ${clause}) s ON s.id = si.sale_id
         JOIN products p ON p.id = si.product_id AND p.company_id = ?
-        JOIN product_variations v ON v.id = si.variation_id AND v.company_id = s.company_id
        WHERE 1=1 ${itemClause}
        GROUP BY si.product_id
        ORDER BY quantity DESC
@@ -100,32 +98,28 @@ router.get("/", requireAuth, (req: Request, res: Response) => {
     .all(...topParams) as any[];
 
   const categoryFilter = Number(req.query.category_id) > 0 ? "AND p.category_id = ?" : "";
-  const categoryParams = Number(req.query.category_id) > 0 ? [companyId, companyId, Number(req.query.category_id)] : [companyId, companyId];
+  const categoryParams = Number(req.query.category_id) > 0 ? [companyId, Number(req.query.category_id)] : [companyId];
 
   const stock = db
     .prepare(
-      `SELECT v.id, v.product_id, p.name AS product_name, p.sku, col.name AS color_name, s.name AS size_name,
-              v.stock, v.min_stock, p.sale_price_cents, p.sale_price_cents * v.stock AS stock_value_cents
-       FROM product_variations v
-       JOIN products p ON p.id = v.product_id
-       JOIN colors col ON col.id = v.color_id
-       JOIN sizes s ON s.id = v.size_id
-        WHERE p.company_id = ? AND v.company_id = ? ${categoryFilter}
-       ORDER BY p.name, s.sort_order, col.name`
+      `SELECT p.id, p.name AS product_name, p.stock, p.min_stock,
+              p.sale_price_cents, p.sale_price_cents * p.stock AS stock_value_cents
+        FROM products p
+         WHERE p.company_id = ? ${categoryFilter}
+        ORDER BY p.name`
     )
     .all(...categoryParams) as any[];
 
   const stockByCategory = db
     .prepare(
       `SELECT COALESCE(c.name, 'Sem categoria') AS name,
-              SUM(v.stock) AS pieces,
-              COALESCE(SUM(v.stock * p.sale_price_cents), 0) AS value_cents
-       FROM product_variations v
-       JOIN products p ON p.id = v.product_id
-       LEFT JOIN categories c ON c.id = p.category_id
-        WHERE p.company_id = ? AND v.company_id = ? ${categoryFilter}
-       GROUP BY c.name
-       ORDER BY pieces DESC`
+              SUM(p.stock) AS pieces,
+              COALESCE(SUM(p.stock * p.sale_price_cents), 0) AS value_cents
+        FROM products p
+        LEFT JOIN categories c ON c.id = p.category_id AND c.company_id = p.company_id
+         WHERE p.company_id = ? ${categoryFilter}
+        GROUP BY c.name
+        ORDER BY pieces DESC`
     )
     .all(...categoryParams) as any[];
 

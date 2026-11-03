@@ -65,5 +65,7 @@ export function generateTamperedToken(): string {
 }
 
 export function cleanupTestData(): void {
+  // stock_movements.user_id referencia users — limpa primeiro para o FK não bloquear.
+  db.prepare('DELETE FROM stock_movements').run();
   db.prepare('DELETE FROM users WHERE email LIKE ?').run('test-%@%');
 }

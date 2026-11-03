@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
-import { Plus, Trash2, Edit, Loader2, Search } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Plus, Trash2, Edit, Loader2, Search, Tags } from "lucide-react";
 import { api } from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
@@ -17,6 +18,8 @@ interface Product {
   created_at: string;
   category_name?: string;
   addons?: { id: number; name: string; price_cents: number }[];
+  stock?: number;
+  min_stock?: number;
 }
 
 interface Addon {
@@ -54,6 +57,7 @@ const EMPTY_FORM = {
 
 export default function Products() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const { success, error: toastError } = useToast();
 
   const [products, setProducts] = useState<any[]>([]);
@@ -67,6 +71,7 @@ export default function Products() {
   const [categoryFilter, setCategoryFilter] = useState(0);
   const [activeFilter, setActiveFilter] = useState(-1);
   const [showForm, setShowForm] = useState(false);
+  const [selected, setSelected] = useState<number[]>([]);
 
   function getCategoryName(catId: number): string {
     return categories.find(c => c.id === catId)?.name || "—";
@@ -178,7 +183,7 @@ export default function Products() {
 
   async function toggleActive(product: any) {
     try {
-      await api.put(`/api/products/${product.id}`, { ...product, active: product.active === 1 ? 0 : 1 });
+      await api.put(`/api/products/${product.id}`, { active: product.active === 1 ? 0 : 1 });
       success(`Produto ${product.active === 1 ? "desativado" : "ativado"}!`);
       loadProducts();
     } catch (err: any) {
@@ -195,6 +200,19 @@ export default function Products() {
     } catch (err: any) {
       toastError(err?.message ?? "Erro ao remover.");
     }
+  }
+
+  function toggleSelect(id: number) {
+    setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
+  }
+
+  function toggleSelectAll() {
+    setSelected((s) => (products.length > 0 && products.every((p) => s.includes(p.id)) ? [] : products.map((p) => p.id)));
+  }
+
+  function printLabels() {
+    if (selected.length === 0) return;
+    navigate(`/products/labels?items=${selected.map((id) => `${id}:1`).join(",")}`);
   }
 
   function formatPrice(cents: number) {
@@ -322,6 +340,11 @@ export default function Products() {
       <Card className="p-5">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
           <h2 className="font-display text-lg font-semibold text-zinc-900">Lista de Produtos ({products.length})</h2>
+          {selected.length > 0 && (
+            <Button size="sm" onClick={printLabels}>
+              <Tags size={15} /> Etiquetas ({selected.length})
+            </Button>
+          )}
           <div className="flex gap-2">
             <Input 
               placeholder="Filtrar por nome..." 
@@ -346,23 +369,43 @@ export default function Products() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-zinc-200 text-left text-zinc-500">
-                  <th className="pb-2 pr-4">ID</th>
-                  <th className="pb-2 pr-4">Imagem</th>
-                  <th className="pb-2 pr-4">Nome</th>
-                  <th className="pb-2 pr-4">Categoria</th>
-                  <th className="pb-2 pr-4">Preço</th>
-                  <th className="pb-2 pr-4">Status</th>
-                  <th className="pb-2 pr-4">Adicionais</th>
-                  <th className="pb-2 pr-4 text-right">Ações</th>
-                </tr>
-              </thead>
+                <thead>
+                  <tr className="border-b border-zinc-200 text-left text-zinc-500">
+                    <th className="pb-2 pr-4">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 accent-rose-600"
+                        checked={products.length > 0 && products.every((p) => selected.includes(p.id))}
+                        onChange={toggleSelectAll}
+                        aria-label="Selecionar todos"
+                      />
+                    </th>
+                    <th className="pb-2 pr-4">ID</th>
+                    <th className="pb-2 pr-4">Imagem</th>
+                    <th className="pb-2 pr-4">Nome</th>
+                    <th className="pb-2 pr-4">Categoria</th>
+                    <th className="pb-2 pr-4">Preço</th>
+                    <th className="pb-2 pr-4">Estoque</th>
+                    <th className="pb-2 pr-4">Mín.</th>
+                    <th className="pb-2 pr-4">Status</th>
+                    <th className="pb-2 pr-4">Adicionais</th>
+                    <th className="pb-2 pr-4 text-right">Ações</th>
+                  </tr>
+                </thead>
               <tbody>
                 {products
                   .filter(p => p.name.toLowerCase().includes(search.toLowerCase()))
                   .map((p) => (
                     <tr key={p.id} className="border-b border-zinc-100 hover:bg-zinc-50">
+                      <td className="py-3 pr-4">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 accent-rose-600"
+                          checked={selected.includes(p.id)}
+                          onChange={() => toggleSelect(p.id)}
+                          aria-label={`Selecionar ${p.name}`}
+                        />
+                      </td>
                       <td className="py-3 pr-4 text-zinc-600">{p.id}</td>
                       <td className="py-3 pr-4">
                         {p.image_url ? (
@@ -376,6 +419,12 @@ export default function Products() {
                       <td className="py-3 pr-4 font-medium text-zinc-900 truncate max-w-xs">{p.name}</td>
                       <td className="py-3 pr-4 text-zinc-600">{getCategoryName(p.category_id)}</td>
                       <td className="py-3 pr-4 font-semibold text-rose-600">R$ {(p.sale_price_cents/100).toFixed(2).replace(".", ",")}</td>
+                      <td className="py-3 pr-4">
+                        <span className={`font-bold ${p.stock !== undefined && p.stock <= 0 ? "text-red-600" : p.stock !== undefined && p.min_stock !== undefined && p.min_stock > 0 && p.stock <= p.min_stock ? "text-amber-600" : "text-emerald-600"}`}>
+                          {p.stock !== undefined ? p.stock : "—"}
+                        </span>
+                      </td>
+                      <td className="py-3 pr-4 text-zinc-500">{p.min_stock ?? "—"}</td>
                       <td className="py-3 pr-4">
                         <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${
                           p.active === 1 ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"

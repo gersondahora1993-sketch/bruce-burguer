@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AlertCircle, CheckCircle, Minus, Package, Plus, ShoppingCart, ShoppingBag } from "lucide-react";
 import { api } from "../api/client";
@@ -23,6 +23,8 @@ interface CatalogProduct {
   image_url: string;
   active: number;
   addons: CatalogAddon[];
+  stock?: number;
+  min_stock?: number;
 }
 
 interface CatalogCategory {
@@ -56,6 +58,7 @@ interface CartItem {
   unitCents: number;
   addons: CartAddon[];
   quantity: number;
+  stock?: number;
 }
 
 type LocalPayment = "dinheiro" | "pix" | "cartao_debito" | "cartao_credito" | "fiado";
@@ -112,29 +115,35 @@ export default function CounterSale() {
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
-  const [addonModal, setAddonModal] = useState<{ product: CatalogProduct; quantity: number; addons: CartAddon[] } | null>(null);
+  const [addonModal, setAddonModal] = useState<{ product: CatalogProduct; quantity: number; addons: CartAddon[]; stock: number } | null>(null);
   const [finalizing, setFinalizing] = useState(false);
   const [confirmFinalizeOpen, setConfirmFinalizeOpen] = useState(false);
   const [result, setResult] = useState<{ order_id: number; total_cents: number } | null>(null);
 
+  const load = useCallback(async () => {
+    try {
+      const [p, c, cats] = await Promise.all([
+        api.get<CatalogProduct[]>("/api/products?active=1"),
+        api.get<CatalogCombo[]>("/api/combos?active=1"),
+        api.get<CatalogCategory[]>("/api/categories?active=1"),
+      ]);
+      setProducts(p);
+      setCombos(c);
+      setCategories(cats.filter((x) => x.active));
+    } catch (err: any) {
+      toastError(err?.message ?? "Erro ao carregar catálogo.");
+    }
+  }, [toastError]);
+
   useEffect(() => {
     (async () => {
       try {
-        const [p, c, cats] = await Promise.all([
-          api.get<CatalogProduct[]>("/api/products?active=1"),
-          api.get<CatalogCombo[]>("/api/combos?active=1"),
-          api.get<CatalogCategory[]>("/api/categories?active=1"),
-        ]);
-        setProducts(p);
-        setCombos(c);
-        setCategories(cats.filter((x) => x.active));
-      } catch (err: any) {
-        toastError(err?.message ?? "Erro ao carregar catálogo.");
+        await load();
       } finally {
         setLoading(false);
       }
     })();
-  }, [toastError]);
+  }, [load]);
 
   const term = search.trim().toLowerCase();
 
@@ -177,20 +186,24 @@ export default function CounterSale() {
       price_cents: a.price_cents,
       quantity: 0,
     }));
-    setAddonModal({ product, quantity: 1, addons: baseAddons });
+    setAddonModal({ product, quantity: 1, addons: baseAddons, stock: product.stock ?? Infinity });
   }
 
   function addProductFromModal() {
     if (!addonModal) return;
-    const { product, quantity, addons } = addonModal;
+    const { product, quantity, addons, stock } = addonModal;
     const selected = addons.filter((a) => a.quantity > 0);
+    if (quantity > stock) {
+      toastError("Quantidade maior que o estoque disponível.");
+      return;
+    }
     const key = cartItemKey("product", product.id, selected);
     setCart((prev) => {
       const exists = prev.find((i) => i.key === key);
       if (exists) return prev.map((i) => (i.key === key ? { ...i, quantity: i.quantity + quantity } : i));
       return [
         ...prev,
-        { key, kind: "product", product_id: product.id, name: product.name, unitCents: product.sale_price_cents, addons: selected, quantity },
+        { key, kind: "product", product_id: product.id, name: product.name, unitCents: product.sale_price_cents, addons: selected, quantity, stock },
       ];
     });
     setAddonModal(null);
@@ -208,7 +221,14 @@ export default function CounterSale() {
   }
 
   function updateQty(key: string, delta: number) {
-    setCart((prev) => prev.map((i) => (i.key === key ? { ...i, quantity: Math.max(1, i.quantity + delta) } : i)));
+    setCart((prev) =>
+      prev.map((i) => {
+        if (i.key !== key) return i;
+        const max = (i.kind === "combo" || i.stock == null) ? Infinity : i.stock;
+        const next = Math.max(1, i.quantity + delta);
+        return { ...i, quantity: max === Infinity ? next : Math.min(max, next) };
+      })
+    );
   }
 
   function removeItem(key: string) {
@@ -250,15 +270,19 @@ export default function CounterSale() {
       setCustomerPhone("");
       setPayment("dinheiro");
       success("Venda realizada com sucesso!");
+      load();
     } catch (err: any) {
       const status = err?.status ?? 0;
+      const message = err?.message ?? "";
       let msg: string;
       if (status === 401) msg = "Não autorizado. Faça login novamente.";
       else if (status === 403) msg = "Você não tem permissão para realizar vendas.";
       else if (status === 404) msg = "Pedido/produto/combo não encontrado.";
+      else if (status === 400 && /estoque/i.test(message)) msg = "Estoque insuficiente. Atualize a quantidade ou recarregue os produtos.";
       else if (status >= 500) msg = "Não foi possível concluir a venda. Tente novamente.";
-      else msg = err?.message || "Não foi possível concluir a venda.";
+      else msg = message || "Não foi possível concluir a venda.";
       toastError(msg);
+      load();
     } finally {
       setFinalizing(false);
     }
@@ -370,10 +394,21 @@ export default function CounterSale() {
                         <p className="text-xs text-zinc-400">{p.category_name}</p>
                         {p.description && <p className="mt-0.5 line-clamp-2 text-xs text-zinc-500">{p.description}</p>}
                       </div>
-                      <p className="font-bold text-rose-600">{money(p.sale_price_cents)}</p>
-                      <Button size="sm" className="mt-auto w-full" onClick={() => openAddProduct(p)}>
-                        <Plus size={15} /> {p.addons?.length ? "Montar" : "Adicionar"}
-                      </Button>
+                       <p className="font-bold text-rose-600">{money(p.sale_price_cents)}</p>
+                       {p.stock !== undefined && p.stock <= 0 && (
+                         <span className="inline-block rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">Sem estoque</span>
+                       )}
+                       {p.stock !== undefined && p.stock > 0 && p.min_stock !== undefined && p.min_stock > 0 && p.stock <= p.min_stock && (
+                         <span className="inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">Estoque baixo — {p.stock} disponível</span>
+                       )}
+                       <Button
+                         size="sm"
+                         className="mt-auto w-full"
+                         disabled={p.stock !== undefined && p.stock <= 0}
+                         onClick={() => openAddProduct(p)}
+                       >
+                         <Plus size={15} /> {p.stock !== undefined && p.stock <= 0 ? "Sem estoque" : p.addons?.length ? "Montar" : "Adicionar"}
+                       </Button>
                     </div>
                   </Card>
                 ))}
@@ -589,23 +624,24 @@ export default function CounterSale() {
             <div>
               <p className="mb-1.5 text-sm font-medium text-zinc-700">Quantidade</p>
               <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => setAddonModal((m) => (m ? { ...m, quantity: Math.max(1, m.quantity - 1) } : m))}
-                  className="rounded-md bg-zinc-100 p-2 text-zinc-600 hover:bg-zinc-200"
-                  aria-label="Diminuir"
-                >
-                  <Minus size={16} />
-                </button>
-                <span className="w-8 text-center text-lg font-semibold">{addonModal.quantity}</span>
-                <button
-                  type="button"
-                  onClick={() => setAddonModal((m) => (m ? { ...m, quantity: m.quantity + 1 } : m))}
-                  className="rounded-md bg-zinc-100 p-2 text-zinc-600 hover:bg-zinc-200"
-                  aria-label="Aumentar"
-                >
-                  <Plus size={16} />
-                </button>
+                 <button
+                   type="button"
+                   onClick={() => setAddonModal((m) => (m ? { ...m, quantity: Math.max(1, m.quantity - 1) } : m))}
+                   className="rounded-md bg-zinc-100 p-2 text-zinc-600 hover:bg-zinc-200"
+                   aria-label="Diminuir"
+                 >
+                   <Minus size={16} />
+                 </button>
+                 <span className="w-8 text-center text-lg font-semibold">{addonModal.quantity}</span>
+                 <button
+                   type="button"
+                   onClick={() => setAddonModal((m) => (m ? { ...m, quantity: Math.min(m.stock, m.quantity + 1) } : m))}
+                   className="rounded-md bg-zinc-100 p-2 text-zinc-600 hover:bg-zinc-200"
+                   aria-label="Aumentar"
+                   disabled={addonModal.quantity >= addonModal.stock}
+                 >
+                   <Plus size={16} />
+                 </button>
               </div>
             </div>
 
@@ -652,21 +688,30 @@ export default function CounterSale() {
               </div>
             )}
 
-            <div className="rounded-xl bg-zinc-50 p-3 text-sm text-zinc-600">
-              Prévia:{" "}
-              <strong className="text-zinc-900">
-                {money(
-                  (addonModal.product.sale_price_cents + addonModal.addons.reduce((s, a) => s + a.price_cents * a.quantity, 0)) *
-                    addonModal.quantity
-                )}
-              </strong>
-            </div>
+             {addonModal.stock < Infinity && (
+               <p className="mt-1 text-xs text-zinc-500">
+                 Estoque disponível: <strong>{addonModal.stock}</strong>
+                 {addonModal.product.min_stock != null && addonModal.product.min_stock > 0 && addonModal.product.stock! <= addonModal.product.min_stock
+                   ? " · Estoque baixo"
+                   : ""}
+               </p>
+             )}
+
+             <div className="rounded-xl bg-zinc-50 p-3 text-sm text-zinc-600">
+               Prévia:{" "}
+               <strong className="text-zinc-900">
+                 {(() => {
+                   const addonUnit = addonModal.addons.reduce((s, a) => s + a.price_cents * a.quantity, 0);
+                   return money((addonModal.product.sale_price_cents + addonUnit) * addonModal.quantity);
+                 })()}
+               </strong>
+             </div>
 
             <div className="flex justify-end gap-2 border-t border-zinc-100 pt-3">
               <Button variant="secondary" onClick={() => setAddonModal(null)}>
                 Cancelar
               </Button>
-              <Button onClick={addProductFromModal}>Adicionar ao carrinho</Button>
+              <Button disabled={addonModal.quantity > addonModal.stock} onClick={addProductFromModal}>Adicionar ao carrinho</Button>
             </div>
           </div>
         )}

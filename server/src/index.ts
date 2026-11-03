@@ -9,8 +9,6 @@ import { env } from "./config.js";
 
 import authRoutes from "./routes/auth.js";
 import categoriesRoutes from "./routes/categories.js";
-import colorsRoutes from "./routes/colors.js";
-import sizesRoutes from "./routes/sizes.js";
 import productsRoutes from "./routes/products.js";
 import stockRoutes from "./routes/stock.js";
 import salesRoutes from "./routes/sales.js";
@@ -63,8 +61,6 @@ app.use("/api/categories", requireAuth, requireTenant, categoriesRoutes);
 app.use("/api/products", requireAuth, requireTenant, productsRoutes);
 app.use("/api/addons", requireAuth, requireTenant, addonsRoutes);
 app.use("/api/combos", requireAuth, requireTenant, combosRoutes);
-app.use("/api/colors", requireAuth, requireTenant, colorsRoutes);
-app.use("/api/sizes", requireAuth, requireTenant, sizesRoutes);
 app.use("/api/stock", requireAuth, requireTenant, stockRoutes);
 app.use("/api/sales", requireAuth, requireTenant, salesRoutes);
 app.use("/api/customers", requireAuth, requireTenant, customersRoutes);

@@ -16,28 +16,24 @@ router.get("/", requireAuth, (req: Request, res: Response) => {
 
   const outOfStock = db
     .prepare(
-       `SELECT COUNT(*) AS c FROM products p WHERE p.active = 1 AND p.company_id = ? AND EXISTS (
-         SELECT 1 FROM product_variations v WHERE v.product_id = p.id AND v.company_id = p.company_id GROUP BY v.product_id HAVING MAX(v.stock) <= 0
-       )`
+      `SELECT COUNT(*) AS c FROM products WHERE active = 1 AND company_id = ? AND stock <= 0`
     )
     .get(companyId) as { c: number };
 
   const lowStock = db
     .prepare(
-       `SELECT COUNT(*) AS c FROM products p WHERE p.active = 1 AND p.company_id = ? AND EXISTS (
-         SELECT 1 FROM product_variations v WHERE v.product_id = p.id AND v.company_id = p.company_id AND v.stock > 0 AND v.stock <= v.min_stock
-       )`
+      `SELECT COUNT(*) AS c FROM products WHERE active = 1 AND company_id = ? AND stock > 0 AND stock <= min_stock`
     )
     .get(companyId) as { c: number };
 
   const stockAgg = db
     .prepare(
-      `SELECT COALESCE(SUM(v.stock), 0) AS pieces,
-              COALESCE(SUM(v.stock * p.sale_price_cents), 0) AS value_cents
-        FROM product_variations v JOIN products p ON p.id = v.product_id
-        WHERE v.company_id = ? AND p.company_id = ?`
+      `SELECT COALESCE(SUM(stock), 0) AS pieces,
+              COALESCE(SUM(stock * sale_price_cents), 0) AS value_cents
+         FROM products
+        WHERE company_id = ?`
     )
-    .get(companyId, companyId) as { pieces: number; value_cents: number };
+    .get(companyId) as { pieces: number; value_cents: number };
 
   const salesDay = db
      .prepare(`SELECT COUNT(*) AS c, COALESCE(SUM(total_cents), 0) AS total FROM sales WHERE status = 'ativa' AND created_at >= ? AND company_id = ?`)
@@ -53,7 +49,6 @@ router.get("/", requireAuth, (req: Request, res: Response) => {
         FROM sale_items si
         JOIN sales s ON s.id = si.sale_id
         JOIN products p ON p.id = si.product_id AND p.company_id = s.company_id
-        JOIN product_variations v ON v.id = si.variation_id AND v.company_id = s.company_id
         WHERE s.status = 'ativa' AND s.created_at >= ? AND s.company_id = ?`
     )
     .get(monthStart(), companyId) as { c: number };
@@ -74,7 +69,6 @@ router.get("/", requireAuth, (req: Request, res: Response) => {
          FROM sale_items si
          JOIN sales s ON s.id = si.sale_id
          JOIN products p ON p.id = si.product_id AND p.company_id = s.company_id
-         JOIN product_variations v ON v.id = si.variation_id AND v.company_id = s.company_id
          WHERE s.status = 'ativa' AND s.created_at >= ? AND s.company_id = ?
        GROUP BY si.product_id
        ORDER BY quantity DESC
@@ -85,16 +79,15 @@ router.get("/", requireAuth, (req: Request, res: Response) => {
   const stockByCategory = db
     .prepare(
       `SELECT COALESCE(c.name, 'Sem categoria') AS name,
-              SUM(v.stock) AS pieces,
-              SUM(v.stock * p.sale_price_cents) AS value_cents
-       FROM product_variations v
-       JOIN products p ON p.id = v.product_id
-        LEFT JOIN categories c ON c.id = p.category_id AND c.company_id = p.company_id
-        WHERE v.company_id = ? AND p.company_id = ?
-        GROUP BY c.name
+              SUM(p.stock) AS pieces,
+              SUM(p.stock * p.sale_price_cents) AS value_cents
+        FROM products p
+         LEFT JOIN categories c ON c.id = p.category_id AND c.company_id = p.company_id
+         WHERE p.company_id = ?
+         GROUP BY c.name
        ORDER BY pieces DESC`
     )
-    .all(companyId, companyId) as any[];
+    .all(companyId) as any[];
 
   res.json({
     totals: {

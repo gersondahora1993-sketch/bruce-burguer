@@ -39,8 +39,6 @@ const MENU: MenuItem[] = [
       { label: "Todos os produtos", to: "/products" },
       { label: "Cadastrar produto", to: "/products/new" },
       { label: "Categorias", to: "/categories" },
-      { label: "Cores", to: "/colors" },
-      { label: "Tamanhos", to: "/sizes" },
     ],
   },
   {

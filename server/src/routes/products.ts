@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { db } from "../db.js";
 import { requireAuth, requireRole } from "../auth.js";
+import { adjustStock } from "../lib/stock.js";
 import type { Request, Response } from "express";
 
 const router = Router();
@@ -36,7 +37,7 @@ router.get("/", requireAuth, (req: Request, res: Response) => {
 
     let sql = `
       SELECT p.id, p.name, p.description, p.category_id, p.sale_price_cents,
-             p.image_url, p.active, p.created_at,
+             p.image_url, p.active, p.stock, p.min_stock, p.created_at,
              c.name as category_name
       FROM products p
       LEFT JOIN categories c ON c.id = p.category_id AND c.company_id = p.company_id
@@ -106,7 +107,7 @@ router.get("/:id", requireAuth, (req: Request, res: Response) => {
     const row = db
       .prepare(
         `SELECT p.id, p.name, p.description, p.category_id, p.sale_price_cents,
-                p.image_url, p.active, p.created_at,
+                p.image_url, p.active, p.stock, p.min_stock, p.created_at,
                 c.name as category_name
          FROM products p
          LEFT JOIN categories c ON c.id = p.category_id AND c.company_id = p.company_id
@@ -132,6 +133,15 @@ router.get("/:id", requireAuth, (req: Request, res: Response) => {
   }
 });
 
+function parseNonNegativeInt(raw: unknown): { value: number } | { error: string } {
+  if (raw === undefined || raw === null || raw === "") return { value: 0 };
+  const text = String(raw);
+  if (!/^\d+$/.test(text)) return { error: "Valor numérico inválido." };
+  const value = Number(text);
+  if (!Number.isSafeInteger(value) || value < 0) return { error: "Valor numérico inválido." };
+  return { value };
+}
+
 // POST - Criar produto
 router.post("/", requireAuth, requireRole("admin"), (req: Request, res: Response) => {
   try {
@@ -141,6 +151,11 @@ router.post("/", requireAuth, requireRole("admin"), (req: Request, res: Response
     if (!name || !name.trim()) { res.status(400).json({ error: "Nome do produto é obrigatório." }); return; }
     if (!category_id || Number(category_id) <= 0) { res.status(400).json({ error: "Categoria é obrigatória." }); return; }
     if (!sale_price_cents || Number(sale_price_cents) <= 0) { res.status(400).json({ error: "Preço é obrigatório e deve ser maior que zero." }); return; }
+
+    const initialStock = parseNonNegativeInt((req.body ?? {}).stock);
+    if ("error" in initialStock) { res.status(400).json({ error: `Estoque inicial inválido: ${initialStock.error}` }); return; }
+    const minStock = parseNonNegativeInt((req.body ?? {}).min_stock);
+    if ("error" in minStock) { res.status(400).json({ error: `Estoque mínimo inválido: ${minStock.error}` }); return; }
 
     if (!db.prepare("SELECT 1 FROM categories WHERE id = ? AND company_id = ?").get(Number(category_id), companyId)) {
       res.status(400).json({ error: "Categoria não encontrada." }); return;
@@ -156,16 +171,27 @@ router.post("/", requireAuth, requireRole("admin"), (req: Request, res: Response
 
     const productId = db.transaction(() => {
       const info = db.prepare(
-        `INSERT INTO products (name, description, category_id, sale_price_cents, image_url, active, company_id, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO products (name, description, category_id, sale_price_cents, image_url, active, stock, min_stock, company_id, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`
       ).run(
         name.trim(), String(description || "").trim(), Number(category_id), Number(sale_price_cents),
-        String(image_url || "").trim(), active === 0 ? 0 : 1, companyId, ts
+        String(image_url || "").trim(), active === 0 ? 0 : 1, minStock.value, companyId, ts
       );
       const pid = Number(info.lastInsertRowid);
       if (addonResult.valid.length > 0) {
         const stmt = db.prepare("INSERT INTO product_addons (product_id, addon_id, company_id, created_at) VALUES (?, ?, ?, ?)");
         for (const aid of addonResult.valid) stmt.run(pid, aid, companyId, ts);
+      }
+      // Estoque inicial SEMPRE com histórico: registra uma movimentação de entrada.
+      if (initialStock.value > 0) {
+        adjustStock({
+          companyId,
+          productId: pid,
+          type: "entrada",
+          quantity: initialStock.value,
+          reason: "Estoque inicial",
+          userId: (req.user as any)?.id ?? null,
+        });
       }
       return pid;
     })();
@@ -182,7 +208,16 @@ router.put("/:id", requireAuth, requireRole("admin"), (req: Request, res: Respon
   try {
     const companyId = (req.user as any).company_id ?? 1;
     const id = Number(req.params.id);
-    const { name, description, category_id, sale_price_cents, image_url, active, addon_ids } = req.body ?? {};
+    const body = req.body ?? {};
+    const { name, description, category_id, sale_price_cents, image_url, active, addon_ids } = body;
+
+    if ("stock" in body) {
+      res.status(400).json({ error: "Alteração de estoque deve ser feita pela API de movimentações de estoque (POST /api/stock/movements)." });
+      return;
+    }
+
+    const minStock = parseNonNegativeInt(body.min_stock);
+    if ("error" in minStock) { res.status(400).json({ error: `Estoque mínimo inválido: ${minStock.error}` }); return; }
 
     if (!db.prepare("SELECT 1 FROM products WHERE id = ? AND company_id = ?").get(id, companyId)) {
       res.status(404).json({ error: "Produto não encontrado." }); return;
@@ -211,6 +246,9 @@ router.put("/:id", requireAuth, requireRole("admin"), (req: Request, res: Respon
         name.trim(), String(description || "").trim(), Number(category_id), Number(sale_price_cents),
         String(image_url || "").trim(), active === 0 ? 0 : 1, id, companyId
       );
+      if (body.min_stock !== undefined && body.min_stock !== null && body.min_stock !== "") {
+        db.prepare("UPDATE products SET min_stock = ? WHERE id = ? AND company_id = ?").run(minStock.value, id, companyId);
+      }
       if (addon_ids && Array.isArray(addon_ids)) {
         db.prepare("DELETE FROM product_addons WHERE product_id = ? AND company_id = ?").run(id, companyId);
         if (addonResult.valid.length > 0) {
@@ -248,6 +286,13 @@ router.delete("/:id", requireAuth, requireRole("admin"), (req: Request, res: Res
     if (orderCount.c > 0) {
       db.prepare("UPDATE products SET active = 0 WHERE id = ? AND company_id = ?").run(id, companyId);
       res.json({ ok: true, message: "Produto desativado (possui histórico de pedidos)." });
+      return;
+    }
+
+    const movementCount = db.prepare("SELECT COUNT(*) as c FROM stock_movements WHERE product_id = ? AND company_id = ?").get(id, companyId) as { c: number };
+    if (movementCount.c > 0) {
+      db.prepare("UPDATE products SET active = 0 WHERE id = ? AND company_id = ?").run(id, companyId);
+      res.json({ ok: true, message: "Produto desativado (possui histórico de estoque)." });
       return;
     }
 

@@ -11,8 +11,6 @@ import LabelsPage from "./pages/LabelsPage";
 import Categories from "./pages/Categories";
 import Addons from "./pages/Addons";
 import Combos from "./pages/Combos";
-import Colors from "./pages/Colors";
-import Sizes from "./pages/Sizes";
 import Stock from "./pages/Stock";
 import CounterSale from "./pages/CounterSale";
 import SalesHistory from "./pages/SalesHistory";
@@ -95,8 +93,6 @@ export default function App() {
         <Route path="/categories" element={<Categories />} />
         <Route path="/addons" element={<Addons />} />
         <Route path="/combos" element={<Combos />} />
-        <Route path="/colors" element={<Colors />} />
-        <Route path="/sizes" element={<Sizes />} />
         <Route path="/stock" element={<Stock />} />
         <Route path="/stock/movements" element={<Stock tab="movements" />} />
         <Route path="/stock/low" element={<Stock tab="low" />} />

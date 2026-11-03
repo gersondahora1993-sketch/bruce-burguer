@@ -165,10 +165,9 @@ router.get("/:id", requireAuth, (req: Request, res: Response) => {
         FROM sale_items it
         JOIN sales s ON s.id = it.sale_id AND s.company_id = ?
         JOIN products p ON p.id = it.product_id AND p.company_id = ?
-        JOIN product_variations v ON v.id = it.variation_id AND v.company_id = ?
         WHERE it.sale_id = ?`
     )
-    .all(companyId, companyId, companyId, rec.sale_id);
+    .all(companyId, companyId, rec.sale_id);
 
   const payments = db
     .prepare(

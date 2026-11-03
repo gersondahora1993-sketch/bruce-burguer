@@ -2,6 +2,10 @@ import { Router } from "express";
 import { db, now } from "../db.js";
 import { requireAuth, requireTenant } from "../auth.js";
 import { env } from "../config.js";
+import {
+  consumeStockForOrder,
+  estornarOrderStock,
+} from "../lib/stock.js";
 import type { Request, Response } from "express";
 
 const router = Router();
@@ -132,6 +136,8 @@ interface CreateOrderInput {
   reference: string;
   notes: string;
   specs: ItemSpec[];
+  /** Presencial baixa o estoque na criação; online não (baixa apenas na confirmação). */
+  applyStock: boolean;
 }
 
 function persistOrder(input: CreateOrderInput) {
@@ -283,6 +289,22 @@ function persistOrder(input: CreateOrderInput) {
       });
     }
 
+    // Baixa de estoque na criação (apenas venda presencial). Combos consomem componentes,
+    // adicionais não consomem. Falhas de estoque revertem o pedido inteiro (rollback).
+    if (input.applyStock) {
+      consumeStockForOrder({
+        companyId: input.companyId,
+        orderId,
+        lines: input.specs.map((s) => ({
+          product_id: s.kind === "product" ? s.id : null,
+          combo_id: s.kind === "combo" ? s.id : null,
+          quantity: s.quantity,
+        })),
+        userId: input.userId,
+        reason: "Venda presencial",
+      });
+    }
+
     return {
       order_id: orderId,
       source: input.source,
@@ -353,6 +375,7 @@ router.post("/", (req: Request, res: Response) => {
     reference,
     notes,
     specs: items.specs!,
+    applyStock: false,
   });
 
   try {
@@ -424,6 +447,7 @@ router.post("/presencial", requireAuth, requireTenant, (req: Request, res: Respo
     reference,
     notes,
     specs: items.specs!,
+    applyStock: true,
   });
 
   try {
@@ -558,6 +582,7 @@ function buildOrderResult(orderId: number, companyId: number) {
 
 router.patch("/:id/status", requireAuth, requireTenant, (req: Request, res: Response) => {
   const companyId = (req.user as any).company_id;
+  const userId = (req.user as any).id ?? null;
   const orderId = Number(req.params.id);
   const target = req.body?.status;
   if (!ORDER_STATUSES.includes(target)) {
@@ -577,12 +602,28 @@ router.patch("/:id/status", requireAuth, requireTenant, (req: Request, res: Resp
     }
 
     if (target === "cancelado") {
+      // Estorna usando as movimentações originais de venda do pedido (idempotente).
+      estornarOrderStock({ companyId, orderId: order.id, userId });
       db.prepare("UPDATE orders SET status = 'cancelado' WHERE id = ? AND company_id = ?").run(order.id, companyId);
       return { status: 200, body: buildOrderResult(order.id, companyId) };
     }
 
     if (tgtIdx !== curIdx + 1) {
       return { status: 400, body: { error: "Transição de status inválida para este pedido." } };
+    }
+
+    if (target === "confirmado") {
+      // Baixa de estoque online apenas em novo -> confirmado (idempotente).
+      const orderItemLines = db
+        .prepare("SELECT product_id, combo_id, quantity FROM order_items WHERE order_id = ? AND company_id = ?")
+        .all(order.id, companyId) as { product_id: number | null; combo_id: number | null; quantity: number }[];
+      consumeStockForOrder({
+        companyId,
+        orderId: order.id,
+        lines: orderItemLines,
+        userId,
+        reason: "Confirmação de pedido",
+      });
     }
 
     if (target === "entregue") {

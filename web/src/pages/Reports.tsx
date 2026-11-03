@@ -320,7 +320,6 @@ export default function Reports() {
                   <thead>
                     <tr className="border-b border-zinc-100 text-left text-xs tracking-wide text-zinc-500 uppercase">
                       <th className="px-2 py-1.5">Produto</th>
-                      <th className="px-2 py-1.5">Var.</th>
                       <th className="px-2 py-1.5">Estoque</th>
                       <th className="px-2 py-1.5 text-right">Valor</th>
                     </tr>
@@ -330,9 +329,7 @@ export default function Reports() {
                       <tr key={r.id}>
                         <td className="px-2 py-1.5">
                           <p className="truncate font-medium text-zinc-900">{r.product_name}</p>
-                          <p className="text-xs text-zinc-400">{r.sku}</p>
                         </td>
-                        <td className="px-2 py-1.5 whitespace-nowrap text-zinc-500">{r.color_name}/{r.size_name}</td>
                         <td className="px-2 py-1.5">
                           <Badge tone={r.stock <= 0 ? "red" : r.stock <= r.min_stock ? "amber" : "emerald"}>{r.stock}</Badge>
                         </td>

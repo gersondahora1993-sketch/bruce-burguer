@@ -17,7 +17,7 @@ export const GOOD_BARCODE_MODULE_MM = 0.375;
 export const MAX_QUANTITY = 99;
 
 export interface LabelEntry {
-  variationId: number;
+  productId: number;
   quantity: number;
 }
 
@@ -29,11 +29,11 @@ export function parseLabelItems(raw: string | null): LabelEntry[] {
     .filter(Boolean)
     .map((part) => {
       const [idStr, qtyStr] = part.split(":");
-      const variationId = Number(idStr);
+      const productId = Number(idStr);
       const quantity = Math.max(1, Math.min(MAX_QUANTITY, Number(qtyStr) || 1));
-      return { variationId: Number.isFinite(variationId) ? variationId : 0, quantity };
+      return { productId: Number.isFinite(productId) ? productId : 0, quantity };
     })
-    .filter((e) => e.variationId > 0);
+    .filter((e) => e.productId > 0);
 }
 
 export function countLabelCopies(entries: LabelEntry[]): number {

@@ -47,10 +47,10 @@ function seedFixtures() {
   const company = db.prepare("INSERT INTO companies (name, slug, status, created_at, updated_at) VALUES (?, ?, 'ativo', ?, ?)").run('Loja Teste 2', 'loja-teste-2-' + Date.now(), TS, TS);
   company2Id = Number(company.lastInsertRowid);
 
-  const insProduct = db.prepare("INSERT INTO products (name, description, category_id, sale_price_cents, image_url, active, company_id, created_at) VALUES (?, '', NULL, ?, '', ?, ?, ?)");
-  const product1Id = Number(insProduct.run('X-Burger Teste', 2000, 1, 1, TS).lastInsertRowid);
-  const product2Id = Number(insProduct.run('X-Salada Inativo', 1500, 0, 1, TS).lastInsertRowid);
-  const product3Id = Number(insProduct.run('X-Burger Loja 2', 999, 1, company2Id, TS).lastInsertRowid);
+  const insProduct = db.prepare("INSERT INTO products (name, description, category_id, sale_price_cents, image_url, active, company_id, created_at, stock, min_stock) VALUES (?, '', NULL, ?, '', ?, ?, ?, ?, ?)");
+  const product1Id = Number(insProduct.run('X-Burger Teste', 2000, 1, 1, TS, 5000, 0).lastInsertRowid);
+  const product2Id = Number(insProduct.run('X-Salada Inativo', 1500, 0, 1, TS, 0, 0).lastInsertRowid);
+  const product3Id = Number(insProduct.run('X-Burger Loja 2', 999, 1, company2Id, TS, 5000, 0).lastInsertRowid);
 
   const insAddon = db.prepare("INSERT INTO addons (name, price_cents, active, company_id, created_at) VALUES (?, ?, ?, ?, ?)");
   const addonAId = Number(insAddon.run('Bacon', 300, 1, 1, TS).lastInsertRowid);
