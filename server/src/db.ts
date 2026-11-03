@@ -554,6 +554,7 @@ export function migrateSchema(): void {
   ensureBootstrapCompany();
   ensurePresencialColumns();
   ensureStockColumns();
+  ensureCommerceTables();
   ensureTenantIndexes();
   db.pragma("foreign_keys = ON");
 }
@@ -587,6 +588,128 @@ function ensureStockColumns(): void {
   addColumnIfMissing("products", "min_stock", "min_stock INTEGER NOT NULL DEFAULT 0");
 }
 
+// Módulo comercial (vendas de balcão/fiadas, caixa, recebíveis, fiscal, clientes):
+// tabelas criadas por versões antigas do schema e ausentes em bancos novos.
+// CREATE TABLE IF NOT EXISTS = no-op em bancos que já as possuem.
+function ensureCommerceTables(): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS customers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      company_id INTEGER NOT NULL DEFAULT 1,
+      name TEXT NOT NULL DEFAULT '',
+      cpf TEXT NOT NULL DEFAULT '',
+      phone TEXT NOT NULL DEFAULT '',
+      whatsapp TEXT NOT NULL DEFAULT '',
+      email TEXT NOT NULL DEFAULT '',
+      address TEXT NOT NULL DEFAULT '',
+      number TEXT NOT NULL DEFAULT '',
+      complement TEXT NOT NULL DEFAULT '',
+      neighborhood TEXT NOT NULL DEFAULT '',
+      city TEXT NOT NULL DEFAULT '',
+      uf TEXT NOT NULL DEFAULT '',
+      cep TEXT NOT NULL DEFAULT '',
+      notes TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'ativo',
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      created_by INTEGER,
+      updated_by INTEGER,
+      inactivated_at TEXT,
+      inactivated_by INTEGER
+    );
+    CREATE TABLE IF NOT EXISTS sales (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      company_id INTEGER NOT NULL DEFAULT 1,
+      customer_id INTEGER,
+      customer_name TEXT NOT NULL DEFAULT '',
+      total_cents INTEGER NOT NULL DEFAULT 0,
+      payment_method TEXT NOT NULL DEFAULT 'pix',
+      status TEXT NOT NULL DEFAULT 'ativa',
+      user_id INTEGER,
+      amount_received_cents INTEGER NOT NULL DEFAULT 0,
+      change_cents INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      cancelled_at TEXT,
+      cancelled_by INTEGER
+    );
+    CREATE TABLE IF NOT EXISTS sale_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      company_id INTEGER NOT NULL DEFAULT 1,
+      sale_id INTEGER NOT NULL,
+      product_id INTEGER,
+      variation_id INTEGER,
+      product_name TEXT NOT NULL DEFAULT '',
+      color_name TEXT NOT NULL DEFAULT '',
+      size_name TEXT NOT NULL DEFAULT '',
+      quantity INTEGER NOT NULL DEFAULT 1,
+      unit_price_cents INTEGER NOT NULL DEFAULT 0,
+      total_cents INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE TABLE IF NOT EXISTS receivables (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      company_id INTEGER NOT NULL DEFAULT 1,
+      sale_id INTEGER,
+      customer_id INTEGER,
+      customer_name TEXT NOT NULL DEFAULT '',
+      total_cents INTEGER NOT NULL DEFAULT 0,
+      due_date TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'pendente',
+      paid_at TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE TABLE IF NOT EXISTS cash_sessions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      company_id INTEGER NOT NULL DEFAULT 1,
+      user_id INTEGER,
+      opened_at TEXT NOT NULL DEFAULT (datetime('now')),
+      closed_at TEXT,
+      opening_cents INTEGER NOT NULL DEFAULT 0,
+      closing_cents INTEGER NOT NULL DEFAULT 0,
+      total_sales_cents INTEGER NOT NULL DEFAULT 0,
+      total_saidas_cents INTEGER NOT NULL DEFAULT 0,
+      expected_cents INTEGER NOT NULL DEFAULT 0,
+      dinheiro_cents INTEGER NOT NULL DEFAULT 0,
+      pix_cents INTEGER NOT NULL DEFAULT 0,
+      debito_cents INTEGER NOT NULL DEFAULT 0,
+      credito_cents INTEGER NOT NULL DEFAULT 0,
+      fiado_cents INTEGER NOT NULL DEFAULT 0,
+      diff_cents INTEGER NOT NULL DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'aberto'
+    );
+    CREATE TABLE IF NOT EXISTS cash_entries (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      company_id INTEGER NOT NULL DEFAULT 1,
+      cash_session_id INTEGER,
+      type TEXT NOT NULL DEFAULT '',
+      reference TEXT NOT NULL DEFAULT '',
+      description TEXT NOT NULL DEFAULT '',
+      receivable_id INTEGER,
+      sale_id INTEGER,
+      customer_name TEXT NOT NULL DEFAULT '',
+      amount_cents INTEGER NOT NULL DEFAULT 0,
+      payment_method TEXT NOT NULL DEFAULT 'dinheiro',
+      user_id INTEGER,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE TABLE IF NOT EXISTS fiscal_documents (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      sale_id INTEGER,
+      type TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT '',
+      number TEXT NOT NULL DEFAULT '',
+      series TEXT NOT NULL DEFAULT '',
+      access_key TEXT NOT NULL DEFAULT '',
+      protocol TEXT NOT NULL DEFAULT '',
+      xml TEXT NOT NULL DEFAULT '',
+      issued_at TEXT,
+      provider TEXT NOT NULL DEFAULT '',
+      cancellation_reason TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+}
+
 export function ensureVariationBarcodes(opts?: { productId?: number; companyId?: number }): number {
   // Tabela product_variations removida; retornar 0.
   return 0;
@@ -618,5 +741,16 @@ function ensureTenantIndexes(): void {
     CREATE INDEX IF NOT EXISTS idx_stock_movements_reference ON stock_movements(reference_type, reference_id);
     CREATE INDEX IF NOT EXISTS idx_stock_movements_company_created ON stock_movements(company_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_business_settings_company ON business_settings(company_id);
+    CREATE INDEX IF NOT EXISTS idx_customers_company ON customers(company_id);
+    CREATE INDEX IF NOT EXISTS idx_sales_company ON sales(company_id);
+    CREATE INDEX IF NOT EXISTS idx_sales_customer ON sales(customer_id);
+    CREATE INDEX IF NOT EXISTS idx_sale_items_sale ON sale_items(sale_id);
+    CREATE INDEX IF NOT EXISTS idx_sale_items_product ON sale_items(product_id);
+    CREATE INDEX IF NOT EXISTS idx_receivables_company ON receivables(company_id);
+    CREATE INDEX IF NOT EXISTS idx_receivables_sale ON receivables(sale_id);
+    CREATE INDEX IF NOT EXISTS idx_cash_sessions_company ON cash_sessions(company_id);
+    CREATE INDEX IF NOT EXISTS idx_cash_entries_session ON cash_entries(cash_session_id);
+    CREATE INDEX IF NOT EXISTS idx_cash_entries_receivable ON cash_entries(receivable_id);
+    CREATE INDEX IF NOT EXISTS idx_fiscal_documents_sale ON fiscal_documents(sale_id);
   `);
 }
